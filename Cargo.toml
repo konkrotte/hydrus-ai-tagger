@@ -1,0 +1,10 @@
+[package]
+name = "hydrus-ai-tagger-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+image = "0.25.2"
+ndarray = "0.16.1"
+ort = "2.0.0-rc.6"
+rocket = "0.5.1"
