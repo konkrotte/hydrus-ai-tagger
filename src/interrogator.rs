@@ -1,10 +1,12 @@
 use std::{collections::HashMap, fs, path};
 
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use image::{DynamicImage, GenericImageView};
-use ndarray::{Array, Dim};
+use ndarray::Array;
 use ort::{inputs, CoreMLExecutionProvider, GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
+
+type InterrogateReturn = Result<(Option<HashMap<String, f32>>, HashMap<String, f32>)>;
 
 pub struct Interrogator {
     model: Session,
@@ -87,15 +89,21 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(&self, original_image: DynamicImage, threshold: f32) {
-        let size = self.model.inputs[0].input_type.tensor_dimensions().unwrap()[1];
+    pub fn interrogate(
+        &self,
+        original_image: DynamicImage,
+        threshold: f32,
+    ) -> InterrogateReturn {
+        let size = self.model.inputs[0].input_type.tensor_dimensions().ok_or(anyhow!("No input tensor dimensions"))?[1];
         let size = size as usize;
+
         let image = original_image.resize_exact(
             size as u32,
             size as u32,
             image::imageops::FilterType::CatmullRom,
         );
         let mut input = Array::zeros((1, size, size, 3));
+
         for pixel in image.pixels() {
             let x = pixel.0 as usize;
             let y = pixel.1 as usize;
@@ -104,19 +112,36 @@ impl Interrogator {
             input[[0, y, x, 1]] = g as f32;
             input[[0, y, x, 2]] = r as f32;
         }
+
         let input_name = &self.model.inputs[0].name;
         let outputs = self
             .model
-            .run(inputs![input_name => input.view()].unwrap())
-            .unwrap();
+            .run(inputs![input_name => input.view()]?)?;
         let output = &outputs[0];
-        let confidences = output.try_extract_tensor::<f32>().unwrap().to_owned();
+        let confidences = output.try_extract_tensor::<f32>()?.to_owned();
         let mut result = HashMap::new();
+
         for (tag, &confidence) in self.tags.iter().zip(confidences.iter()) {
             if confidence > threshold {
                 result.insert(tag.clone(), confidence);
             }
         }
-        println!("{:?}", result);
+
+        if self.ratings_flag {
+            let mut ratings = HashMap::new();
+            let mut regular_tags = HashMap::new();
+
+            for (key, value) in result.into_iter() {
+                if ratings.len() < self.number_of_ratings {
+                    ratings.insert(key, value);
+                } else {
+                    regular_tags.insert(key, value);
+                }
+            }
+
+            Ok((Some(ratings), regular_tags))
+        } else {
+            Ok((None, result))
+        }
     }
 }
