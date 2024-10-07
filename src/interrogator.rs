@@ -65,7 +65,9 @@ impl Interrogator {
         let model_info: ModelInfo = serde_json::from_str(&fs::read_to_string(model_info_file)?)?;
         let tags_file = model_dir.join(model_info.tags_file);
         let mut csv_rdr = csv::Reader::from_path(tags_file)?;
-        let tags: Vec<Tag> = csv_rdr.deserialize::<Tag>().filter_map(|res| Some(res.unwrap())).collect();
+        let tags: Vec<Tag> = csv_rdr
+            .deserialize::<Tag>()
+            .collect::<Result<Vec<Tag>, csv::Error>>()?;
         let model_file = model_dir.join(model_info.model_file);
         let model = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
