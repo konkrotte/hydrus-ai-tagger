@@ -57,8 +57,6 @@ impl Interrogator {
             .run(inputs![input_name => input.view()].unwrap())
             .unwrap();
         let output = &outputs[0];
-        let data_ptr = output.data_ptr().unwrap() as *const CString;
-        println!("{}", unsafe { data_ptr.as_ref().unwrap().to_str().unwrap() });
         println!("{:?}", output.memory_info());
         println!("{:?}", output.type_id());
         println!("{:?}", output.dtype().unwrap());
