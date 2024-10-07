@@ -3,15 +3,14 @@ use std::{collections::HashMap, fs, path};
 use anyhow::{ensure, Result};
 use image::{DynamicImage, GenericImageView};
 use ndarray::{Array, Dim};
-use ort::{inputs, GraphOptimizationLevel, Session};
+use ort::{inputs, CoreMLExecutionProvider, GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
 
 pub struct Interrogator {
-    name: String,
     model: Session,
     ratings_flag: bool,
     number_of_ratings: usize,
-    tags: Vec<Tag>, // FIXME: should be something else
+    tags: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,19 +62,24 @@ impl Interrogator {
 
         let model_info_file = model_dir.join("info.json");
         let model_info: ModelInfo = serde_json::from_str(&fs::read_to_string(model_info_file)?)?;
+
+        println!("Model name: {}", model_info.name);
+        println!("Model source: {}", model_info.source);
+
         let tags_file = model_dir.join(model_info.tags_file);
         let mut csv_rdr = csv::Reader::from_path(tags_file)?;
-        let tags: Vec<Tag> = csv_rdr
-            .deserialize::<Tag>()
-            .collect::<Result<Vec<Tag>, csv::Error>>()?;
+        let tags: Vec<String> = csv_rdr
+            .deserialize()
+            .filter_map(|result: Result<Tag, csv::Error>| result.ok().map(|tag| tag.name))
+            .collect();
         let model_file = model_dir.join(model_info.model_file);
         let model = Session::builder()?
+            .with_execution_providers([CoreMLExecutionProvider::default().build()])?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
             .commit_from_file(model_file)?;
 
         Ok(Interrogator {
-            name: model_info.name,
             model,
             ratings_flag: model_info.ratings_flag,
             number_of_ratings: model_info.number_of_ratings,
@@ -83,7 +87,7 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(&self, original_image: DynamicImage) {
+    pub fn interrogate(&self, original_image: DynamicImage, threshold: f32) {
         let size = self.model.inputs[0].input_type.tensor_dimensions().unwrap()[1];
         let size = size as usize;
         let image = original_image.resize_exact(
@@ -91,29 +95,28 @@ impl Interrogator {
             size as u32,
             image::imageops::FilterType::CatmullRom,
         );
-
         let mut input = Array::zeros((1, size, size, 3));
         for pixel in image.pixels() {
             let x = pixel.0 as usize;
             let y = pixel.1 as usize;
-            let [r, g, b, _] = pixel.2 .0;
-            input[[0, y, x, 0]] = (b as f32) / 255.;
-            input[[0, y, x, 1]] = (g as f32) / 255.;
-            input[[0, x, y, 2]] = (r as f32) / 255.;
+            let [r, g, b, _] = pixel.2.0;
+            input[[0, y, x, 0]] = b as f32;
+            input[[0, y, x, 1]] = g as f32;
+            input[[0, y, x, 2]] = r as f32;
         }
-
         let input_name = &self.model.inputs[0].name;
         let outputs = self
             .model
             .run(inputs![input_name => input.view()].unwrap())
             .unwrap();
         let output = &outputs[0];
-        let confidences = output
-            .try_extract_tensor::<f32>()
-            .unwrap()
-            .to_owned()
-            .into_dimensionality::<Dim<[usize; 2]>>()
-            .unwrap();
-        println!("{:?}", confidences);
+        let confidences = output.try_extract_tensor::<f32>().unwrap().to_owned();
+        let mut result = HashMap::new();
+        for (tag, &confidence) in self.tags.iter().zip(confidences.iter()) {
+            if confidence > threshold {
+                result.insert(tag.clone(), confidence);
+            }
+        }
+        println!("{:?}", result);
     }
 }
