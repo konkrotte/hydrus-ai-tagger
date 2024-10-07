@@ -1,10 +1,20 @@
+use std::path;
+
 use image::ImageReader;
 use interrogator::Interrogator;
 use rocket::State;
+use clap::Parser;
 
 mod interrogator;
 #[macro_use]
 extern crate rocket;
+
+#[derive(Parser)]
+#[command(author, version, about)]
+struct Args {
+    #[arg(short, long)]
+    model: path::PathBuf
+}
 
 #[get("/lookup?<hash>")]
 fn lookup(hash: &str, interrogator: &State<Interrogator>) -> String {
@@ -16,7 +26,8 @@ fn lookup(hash: &str, interrogator: &State<Interrogator>) -> String {
 
 #[launch]
 fn rocket() -> _ {
-    let interrogator = Interrogator::init("name", "models/Z3D-E621-Convnext.onnx", "");
+    let args = Args::parse();
+    let interrogator = Interrogator::init("name", args.model.as_path().to_str().unwrap(), "");
     rocket::build()
         .mount("/", routes![lookup])
         .manage(interrogator)
