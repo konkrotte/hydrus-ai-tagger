@@ -89,12 +89,11 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(
-        &self,
-        original_image: DynamicImage,
-        threshold: f32,
-    ) -> InterrogateReturn {
-        let size = self.model.inputs[0].input_type.tensor_dimensions().ok_or(anyhow!("No input tensor dimensions"))?[1];
+    pub fn interrogate(&self, original_image: DynamicImage, threshold: f32) -> InterrogateReturn {
+        let size = self.model.inputs[0]
+            .input_type
+            .tensor_dimensions()
+            .ok_or(anyhow!("No input tensor dimensions"))?[1];
         let size = size as usize;
 
         let image = original_image.resize_exact(
@@ -114,9 +113,7 @@ impl Interrogator {
         }
 
         let input_name = &self.model.inputs[0].name;
-        let outputs = self
-            .model
-            .run(inputs![input_name => input.view()]?)?;
+        let outputs = self.model.run(inputs![input_name => input.view()]?)?;
         let output = &outputs[0];
         let confidences = output.try_extract_tensor::<f32>()?.to_owned();
         let mut result = HashMap::new();
