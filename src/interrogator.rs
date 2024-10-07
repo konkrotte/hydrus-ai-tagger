@@ -11,10 +11,10 @@ pub struct Interrogator {
     model: Session,
     ratings_flag: bool,
     number_of_ratings: usize,
-    tags: Vec<String>, // FIXME: should be something else
+    tags: Vec<Tag>, // FIXME: should be something else
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct ModelInfo {
     #[serde(rename = "modelname")]
     name: String,
@@ -28,6 +28,15 @@ struct ModelInfo {
     ratings_flag: bool,
     #[serde(rename = "numberofratings")]
     number_of_ratings: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Tag {
+    #[serde(rename = "tag_id")]
+    id: usize,
+    name: String,
+    category: usize,
+    count: usize,
 }
 
 fn from_int_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
@@ -54,8 +63,10 @@ impl Interrogator {
 
         let model_info_file = model_dir.join("info.json");
         let model_info: ModelInfo = serde_json::from_str(&fs::read_to_string(model_info_file)?)?;
+        let tags_file = model_dir.join(model_info.tags_file);
+        let mut csv_rdr = csv::Reader::from_path(tags_file)?;
+        let tags: Vec<Tag> = csv_rdr.deserialize::<Tag>().filter_map(|res| Some(res.unwrap())).collect();
         let model_file = model_dir.join(model_info.model_file);
-
         let model = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
@@ -66,7 +77,7 @@ impl Interrogator {
             model,
             ratings_flag: model_info.ratings_flag,
             number_of_ratings: model_info.number_of_ratings,
-            tags: vec![],
+            tags,
         })
     }
 
