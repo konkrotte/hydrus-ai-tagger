@@ -99,7 +99,7 @@ impl Interrogator {
         for pixel in image.pixels() {
             let x = pixel.0 as usize;
             let y = pixel.1 as usize;
-            let [r, g, b, _] = pixel.2.0;
+            let [r, g, b, _] = pixel.2 .0;
             input[[0, y, x, 0]] = b as f32;
             input[[0, y, x, 1]] = g as f32;
             input[[0, y, x, 2]] = r as f32;
