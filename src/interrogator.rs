@@ -76,7 +76,6 @@ impl Interrogator {
             .collect();
         let model_file = model_dir.join(model_info.model_file);
         let model = Session::builder()?
-            .with_execution_providers([CoreMLExecutionProvider::default().build()])?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(4)?
             .commit_from_file(model_file)?;
