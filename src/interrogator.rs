@@ -1,37 +1,76 @@
-use std::{any::Any, collections::HashMap, ffi::CString};
+use std::{collections::HashMap, fs, path};
 
+use anyhow::{ensure, Result};
 use image::{DynamicImage, GenericImageView};
-use ndarray::Array;
+use ndarray::{Array, Dim};
 use ort::{inputs, GraphOptimizationLevel, Session};
+use serde::{Deserialize, Deserializer, Serialize};
 
 pub struct Interrogator {
     name: String,
-    pub model: Session,
-    tags: String, // FIXME: should be something else
+    model: Session,
+    ratings_flag: bool,
+    number_of_ratings: usize,
+    tags: Vec<String>, // FIXME: should be something else
+}
+
+#[derive(Serialize, Deserialize)]
+struct ModelInfo {
+    #[serde(rename = "modelname")]
+    name: String,
+    #[serde(rename = "modelfile")]
+    model_file: String,
+    source: String,
+    #[serde(rename = "tagsfile")]
+    tags_file: String,
+    #[serde(rename = "ratingsflag")]
+    #[serde(deserialize_with = "from_int_bool")]
+    ratings_flag: bool,
+    #[serde(rename = "numberofratings")]
+    number_of_ratings: usize,
+}
+
+fn from_int_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let x: isize = Deserialize::deserialize(deserializer)?;
+    match x {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(serde::de::Error::custom(format!(
+            "Invalid boolean value: {}",
+            x
+        ))),
+    }
 }
 
 impl Interrogator {
-    pub fn init(name: &str, model_file: &str, _tags_file: &str) -> Self {
-        let model = Session::builder()
-            .unwrap()
-            .with_optimization_level(GraphOptimizationLevel::Level3)
-            .unwrap()
-            .with_intra_threads(4)
-            .unwrap()
-            .commit_from_file(model_file)
-            .unwrap();
+    pub fn init(model_dir: path::PathBuf) -> Result<Self> {
+        ensure!(
+            model_dir.is_dir(),
+            "Supplied model path does not exist or is not a directory"
+        );
 
-        Interrogator {
-            name: name.to_string(),
+        let model_info_file = model_dir.join("info.json");
+        let model_info: ModelInfo = serde_json::from_str(&fs::read_to_string(model_info_file)?)?;
+        let model_file = model_dir.join(model_info.model_file);
+
+        let model = Session::builder()?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
+            .with_intra_threads(4)?
+            .commit_from_file(model_file)?;
+
+        Ok(Interrogator {
+            name: model_info.name,
             model,
-            tags: "".to_string(),
-        }
+            ratings_flag: model_info.ratings_flag,
+            number_of_ratings: model_info.number_of_ratings,
+            tags: vec![],
+        })
     }
 
-    pub fn interrogate(
-        &self,
-        original_image: DynamicImage,
-    ) -> Option<(HashMap<String, f32>, HashMap<String, f32>)> {
+    pub fn interrogate(&self, original_image: DynamicImage) {
         let size = self.model.inputs[0].input_type.tensor_dimensions().unwrap()[1];
         let size = size as usize;
         let image = original_image.resize_exact(
@@ -51,16 +90,17 @@ impl Interrogator {
         }
 
         let input_name = &self.model.inputs[0].name;
-        let output_name = &self.model.outputs[0].name;
         let outputs = self
             .model
             .run(inputs![input_name => input.view()].unwrap())
             .unwrap();
         let output = &outputs[0];
-        println!("{:?}", output.memory_info());
-        println!("{:?}", output.type_id());
-        println!("{:?}", output.dtype().unwrap());
-        println!("{:?}", output.shape().unwrap());
-        None
+        let confidences = output
+            .try_extract_tensor::<f32>()
+            .unwrap()
+            .to_owned()
+            .into_dimensionality::<Dim<[usize; 2]>>()
+            .unwrap();
+        println!("{:?}", confidences);
     }
 }

@@ -1,9 +1,9 @@
 use std::path;
 
+use clap::Parser;
 use image::ImageReader;
 use interrogator::Interrogator;
 use rocket::State;
-use clap::Parser;
 
 mod interrogator;
 #[macro_use]
@@ -12,8 +12,9 @@ extern crate rocket;
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
+    /// Path to the model folder
     #[arg(short, long)]
-    model: path::PathBuf
+    model_dir: path::PathBuf,
 }
 
 #[get("/lookup?<hash>")]
@@ -27,7 +28,7 @@ fn lookup(hash: &str, interrogator: &State<Interrogator>) -> String {
 #[launch]
 fn rocket() -> _ {
     let args = Args::parse();
-    let interrogator = Interrogator::init("name", args.model.as_path().to_str().unwrap(), "");
+    let interrogator = Interrogator::init(args.model_dir).unwrap();
     rocket::build()
         .mount("/", routes![lookup])
         .manage(interrogator)
