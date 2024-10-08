@@ -1,12 +1,13 @@
-use std::{collections::HashMap, fs, path};
+use std::{fs, path::Path, thread};
 
 use anyhow::{anyhow, ensure, Result};
 use image::{DynamicImage, GenericImageView};
+use indexmap::IndexMap;
 use ndarray::Array;
-use ort::{inputs, CoreMLExecutionProvider, GraphOptimizationLevel, Session};
+use ort::{inputs, GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
 
-type InterrogateReturn = Result<(Option<HashMap<String, f32>>, HashMap<String, f32>)>;
+type InterrogateReturn = Result<(Option<IndexMap<String, f32>>, IndexMap<String, f32>)>;
 
 pub struct Interrogator {
     model: Session,
@@ -56,7 +57,7 @@ where
 }
 
 impl Interrogator {
-    pub fn init(model_dir: path::PathBuf) -> Result<Self> {
+    pub fn init(model_dir: &Path) -> Result<Self> {
         ensure!(
             model_dir.is_dir(),
             "Supplied model path does not exist or is not a directory"
@@ -77,7 +78,7 @@ impl Interrogator {
         let model_file = model_dir.join(model_info.model_file);
         let model = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
-            .with_intra_threads(4)?
+            .with_intra_threads(thread::available_parallelism()?.get())?
             .commit_from_file(model_file)?;
 
         Ok(Interrogator {
@@ -88,7 +89,7 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(&self, original_image: DynamicImage, threshold: f32) -> InterrogateReturn {
+    pub fn interrogate(&self, original_image: DynamicImage) -> InterrogateReturn {
         let size = self.model.inputs[0]
             .input_type
             .tensor_dimensions()
@@ -115,17 +116,15 @@ impl Interrogator {
         let outputs = self.model.run(inputs![input_name => input.view()]?)?;
         let output = &outputs[0];
         let confidences = output.try_extract_tensor::<f32>()?.to_owned();
-        let mut result = HashMap::new();
+        let mut result = IndexMap::new();
 
         for (tag, &confidence) in self.tags.iter().zip(confidences.iter()) {
-            if confidence > threshold {
-                result.insert(tag.clone(), confidence);
-            }
+            result.insert(tag.clone(), confidence);
         }
 
         if self.ratings_flag {
-            let mut ratings = HashMap::new();
-            let mut regular_tags = HashMap::new();
+            let mut ratings = IndexMap::new();
+            let mut regular_tags = IndexMap::new();
 
             for (key, value) in result.into_iter() {
                 if ratings.len() < self.number_of_ratings {
