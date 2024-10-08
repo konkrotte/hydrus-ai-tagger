@@ -203,7 +203,7 @@ fn main() -> Result<()> {
                                 error!("Error evaluating hash: {:?}", e);
                             }
                             debug!("Took {} s", time.elapsed().as_secs_f64());
-                            info!("{}/{} images completed", index, length);
+                            info!("{}/{length} images completed", index + 1);
                         }
                     }
                     Err(e) => error!("Search error: {:?}", e),
