@@ -51,6 +51,9 @@ enum Commands {
         /// URL for the Hydrus Client API server
         #[arg(long)]
         host: String,
+
+        #[arg(short, long, default_value_t = false)]
+        dry_run: bool,
     },
 }
 
@@ -61,6 +64,7 @@ fn evaluate_hash(
     threshold: f32,
     service_key: &str,
     hash: &str,
+    dry_run: bool,
 ) -> Result<()> {
     println!("{}", hash);
     let record = rt.block_on(client.get_file(FileIdentifier::hash(hash)))?;
@@ -82,7 +86,9 @@ fn evaluate_hash(
         )
         .build();
     println!("{:?}", request.service_keys_to_tags);
-    rt.block_on(client.add_tags(request))?;
+    if !dry_run {
+        rt.block_on(client.add_tags(request))?;
+    }
     Ok(())
 }
 
@@ -110,6 +116,7 @@ fn main() -> Result<()> {
             interval,
             access_key,
             host,
+            dry_run,
         } => {
             let rt = Runtime::new()?;
             let client = hydrus_api::Client::new(host, access_key);
@@ -136,6 +143,7 @@ fn main() -> Result<()> {
                                 threshold,
                                 &service_key,
                                 &hash,
+                                dry_run,
                             ) {
                                 println!("Error evaluating hash: {:?}", e);
                             }
