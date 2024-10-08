@@ -57,7 +57,7 @@ enum Commands {
         #[arg(long)]
         host: String,
 
-        #[arg(short, long, default_value_t = false)]
+        #[arg(short, long)]
         dry_run: bool,
     },
 }
