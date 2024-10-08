@@ -1,5 +1,5 @@
 [package]
-name = "hydrus-ai-tagger-service"
+name = "hydrus-ai-tagger"
 version = "0.1.0"
 edition = "2021"
 
