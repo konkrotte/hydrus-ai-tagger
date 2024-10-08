@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand};
 use hydrus_api::api_core::{
     common::FileIdentifier,
@@ -14,6 +14,7 @@ use hydrus_api::api_core::{
 };
 use image::load_from_memory;
 use interrogator::Interrogator;
+use log::{error, info, warn};
 use tokio::runtime::Runtime;
 
 mod interrogator;
@@ -71,8 +72,10 @@ fn evaluate_hash(
     hash: &str,
     dry_run: bool,
 ) -> Result<()> {
-    println!("{}", hash);
-    let record = rt.block_on(client.get_file(FileIdentifier::hash(hash)))?;
+    info!("Evaluating {}", hash);
+    let record = rt
+        .block_on(client.get_file(FileIdentifier::hash(hash)))
+        .context("Error calling Hydrus API")?;
     let image = load_from_memory(&record.bytes)?;
     let (ratings, tags) = interrogator.interrogate(image)?;
     let ratings = ratings.unwrap(); // FIXME
@@ -100,12 +103,12 @@ fn evaluate_hash(
         .add_tags(service_key.to_string(), filtered_tags)
         .build();
 
-    println!("{:?}", request.service_keys_to_tags);
+    info!("Tags to be added: {:?}", request.service_keys_to_tags);
 
     if !dry_run {
         rt.block_on(client.add_tags(request))?;
     } else {
-        println!("not adding tags, because dry run");
+        warn!("Not adding tags, because dry run");
     }
 
     Ok(())
@@ -164,17 +167,17 @@ fn main() -> Result<()> {
                                 &hash,
                                 dry_run,
                             ) {
-                                println!("Error evaluating hash: {:?}", e);
+                                error!("Error evaluating hash: {:?}", e);
                             }
                         }
                     }
-                    Err(e) => println!("Search error: {:?}", e),
+                    Err(e) => error!("Search error: {:?}", e),
                 }
 
                 let elapsed_time = start_time.elapsed();
                 if elapsed_time < interval_duration {
                     let sleep_duration = interval_duration - elapsed_time;
-                    println!("Sleeping for {:?}", sleep_duration);
+                    info!("Sleeping for {:?}", sleep_duration);
                     std::thread::sleep(sleep_duration);
                 }
             }
