@@ -83,7 +83,7 @@ fn evaluate_hash(
     let ratings = ratings.unwrap(); // FIXME
     let rating = ratings
         .par_iter()
-        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(r, _)| format!("rating:{}", r))
         .ok_or_else(|| anyhow!("Ratings was empty"))?;
 
