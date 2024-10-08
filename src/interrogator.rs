@@ -67,8 +67,7 @@ impl Interrogator {
         let model_info_file = model_dir.join("info.json");
         let model_info: ModelInfo = serde_json::from_str(&fs::read_to_string(model_info_file)?)?;
 
-        info!("Model name: {}", model_info.name);
-        info!("Model source: {}", model_info.source);
+        info!("Loading model {} by {}", model_info.name, model_info.source);
 
         let tags_file = model_dir.join(model_info.tags_file);
         let mut csv_rdr = csv::Reader::from_path(tags_file)?;

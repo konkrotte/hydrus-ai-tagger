@@ -75,7 +75,7 @@ fn evaluate_hash(
     hash: &str,
     dry_run: bool,
 ) -> Result<()> {
-    info!("Evaluating {}", hash);
+    debug!("Evaluating {}", hash);
     let record = rt
         .block_on(client.get_file(FileIdentifier::hash(hash)))
         .context("Error calling Hydrus API")?;
@@ -109,10 +109,13 @@ fn evaluate_hash(
         .add_tags(service_key.to_string(), filtered_tags)
         .build();
 
-    info!("Tags to be added: {:?}", request.service_keys_to_tags);
+    debug!("Tags to be added: {:?}", request.service_keys_to_tags);
+    debug!("{:?}", request);
 
     if !dry_run {
-        rt.block_on(client.add_tags(request))?;
+        // FIXME: broken
+        rt.block_on(client.add_tags(request))
+            .context("Failed adding tags")?;
     } else {
         warn!("Not adding tags, because dry run");
     }
