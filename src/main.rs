@@ -193,7 +193,7 @@ fn main() -> Result<()> {
                                 &interrogator,
                                 threshold,
                                 &service_key,
-                                &hash,
+                                hash,
                                 dry_run,
                             ) {
                                 error!("Error evaluating hash: {:?}", e);
