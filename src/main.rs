@@ -15,6 +15,7 @@ use hydrus_api::api_core::{
 use image::load_from_memory;
 use interrogator::Interrogator;
 use log::{error, info, warn};
+use rayon::prelude::*;
 use tokio::runtime::Runtime;
 
 mod interrogator;
@@ -80,13 +81,13 @@ fn evaluate_hash(
     let (ratings, tags) = interrogator.interrogate(image)?;
     let ratings = ratings.unwrap(); // FIXME
     let rating = ratings
-        .into_iter()
+        .par_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(r, _)| format!("rating:{}", r))
         .ok_or_else(|| anyhow!("Ratings was empty"))?;
 
     let mut filtered_tags: Vec<String> = tags
-        .into_iter()
+        .into_par_iter()
         .filter(|(_, confidence)| *confidence > threshold)
         .map(|(tag, _)| {
             if !KAOMOJIS.contains(&tag.as_str()) {
@@ -149,8 +150,8 @@ fn main() -> Result<()> {
             let service_key = rt
                 .block_on(client.get_services())?
                 .services
-                .iter()
-                .find(|x| x.1.name == tag_service)
+                .par_iter()
+                .find_any(|x| x.1.name == tag_service)
                 .map(|x| x.1.name.to_owned())
                 .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
             loop {
