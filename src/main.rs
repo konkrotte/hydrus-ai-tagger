@@ -128,6 +128,7 @@ fn search(rt: &Runtime, client: &hydrus_api::Client, tag_service: &str) -> Resul
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
     let args = Args::parse();
 
     match args.command {
