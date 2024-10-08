@@ -80,12 +80,6 @@ fn evaluate_hash(
         .context("Error calling Hydrus API")?;
     let image = load_from_memory(&record.bytes)?;
     let (ratings, tags) = interrogator.interrogate(image)?;
-    let ratings = ratings.unwrap(); // FIXME
-    let rating = ratings
-        .par_iter()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(r, _)| format!("rating:{}", r))
-        .ok_or_else(|| anyhow!("Ratings was empty"))?;
 
     let mut filtered_tags: Vec<String> = tags
         .into_par_iter()
@@ -98,7 +92,16 @@ fn evaluate_hash(
             }
         })
         .collect();
-    filtered_tags.push(rating);
+
+    if let Some(ratings) = ratings {
+        let rating = ratings
+            .par_iter()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(r, _)| format!("rating:{}", r))
+            .ok_or_else(|| anyhow!("Ratings was empty"))?;
+
+        filtered_tags.push(rating);
+    }
 
     let request = AddTagsRequestBuilder::default()
         .add_hash(hash)
