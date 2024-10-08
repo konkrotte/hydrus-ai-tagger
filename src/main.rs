@@ -80,7 +80,7 @@ fn evaluate_hash(
         .block_on(client.get_file(FileIdentifier::hash(hash)))
         .context("Error calling Hydrus API")?;
     let image = load_from_memory(&record.bytes)?;
-    let (ratings, tags) = interrogator.interrogate(image)?;
+    let (ratings, tags) = interrogator.interrogate(&image)?;
 
     let mut filtered_tags: Vec<String> = tags
         .into_par_iter()

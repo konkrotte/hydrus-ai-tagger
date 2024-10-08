@@ -89,7 +89,7 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(&self, original_image: DynamicImage) -> InterrogateReturn {
+    pub fn interrogate(&self, original_image: &DynamicImage) -> InterrogateReturn {
         let size = self.model.inputs[0]
             .input_type
             .tensor_dimensions()
