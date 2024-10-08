@@ -18,6 +18,11 @@ use tokio::runtime::Runtime;
 
 mod interrogator;
 
+const KAOMOJIS: &[&str] = &[
+    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
+    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
+];
+
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
@@ -70,25 +75,39 @@ fn evaluate_hash(
     let record = rt.block_on(client.get_file(FileIdentifier::hash(hash)))?;
     let image = load_from_memory(&record.bytes)?;
     let (ratings, tags) = interrogator.interrogate(image)?;
+    let ratings = ratings.unwrap(); // FIXME
+    let rating = ratings
+        .into_iter()
+        .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(r, _)| format!("rating:{}", r))
+        .ok_or_else(|| anyhow!("Ratings was empty"))?;
+
+    let mut filtered_tags: Vec<String> = tags
+        .into_iter()
+        .filter(|(_, confidence)| *confidence > threshold)
+        .map(|(tag, _)| {
+            if !KAOMOJIS.contains(&tag.as_str()) {
+                tag.replace('_', " ")
+            } else {
+                tag
+            }
+        })
+        .collect();
+    filtered_tags.push(rating);
 
     let request = AddTagsRequestBuilder::default()
         .add_hash(hash)
-        .add_tags(
-            service_key.to_string(),
-            ratings
-                .as_ref()
-                .unwrap()
-                .iter()
-                .chain(tags.iter())
-                .filter(|tag| *tag.1 > threshold)
-                .map(|tag| tag.0.to_owned())
-                .collect::<Vec<String>>(),
-        )
+        .add_tags(service_key.to_string(), filtered_tags)
         .build();
+
     println!("{:?}", request.service_keys_to_tags);
+
     if !dry_run {
         rt.block_on(client.add_tags(request))?;
+    } else {
+        println!("not adding tags, because dry run");
     }
+
     Ok(())
 }
 
