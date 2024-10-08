@@ -170,7 +170,7 @@ fn main() -> Result<()> {
             let client = hydrus_api::Client::new(host, access_key);
 
             let interval_duration = Duration::from_secs((interval * 60) as u64);
-            let interrogator = Interrogator::init(&model_dir).unwrap();
+            let interrogator = Interrogator::init(&model_dir)?;
             let service_key = rt
                 .block_on(client.get_services())?
                 .services
