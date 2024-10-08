@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueHint};
 use hydrus_api::api_core::{
     common::FileIdentifier,
     endpoints::{
@@ -37,7 +37,7 @@ struct Args {
 enum Commands {
     Daemon {
         /// Path to the model folder
-        #[arg(long)]
+        #[arg(long, value_hint = ValueHint::DirPath)]
         model_dir: path::PathBuf,
 
         /// The threshold for a tag to be used
@@ -60,6 +60,7 @@ enum Commands {
         #[arg(long)]
         host: String,
 
+        /// Don't commit anything to Hydrus
         #[arg(short, long)]
         dry_run: bool,
     },
