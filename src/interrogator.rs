@@ -1,10 +1,13 @@
 use std::{fs, path::Path, thread, time::Instant};
 
 use anyhow::{anyhow, ensure, Result};
-use image::{DynamicImage, GenericImageView};
+use image::{
+    imageops::{self, FilterType},
+    DynamicImage, GenericImageView, ImageBuffer, Rgba,
+};
 use indexmap::IndexMap;
 use log::{debug, info};
-use ndarray::Array;
+use ndarray::{Array, Array4};
 use ort::{inputs, GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -57,6 +60,29 @@ where
     }
 }
 
+fn prepare_image(image: &DynamicImage, size: u32) -> Result<Array4<f32>> {
+    let white = Rgba([255, 255, 255, 255]);
+    let image = image.resize(size, size, FilterType::Lanczos3);
+    let (width, height) = image.dimensions();
+    let mut square_image = ImageBuffer::from_pixel(size, size, white);
+    let x_offset = (size - width) / 2;
+    let y_offset = (size - height) / 2;
+    imageops::overlay(&mut square_image, &image, x_offset.into(), y_offset.into());
+    let image = DynamicImage::ImageRgba8(square_image);
+    let mut input = Array::zeros((1, size.try_into()?, size.try_into()?, 3));
+
+    for pixel in image.pixels() {
+        let x = pixel.0 as usize;
+        let y = pixel.1 as usize;
+        let [r, g, b, _] = pixel.2 .0;
+        input[[0, y, x, 0]] = f32::from(b);
+        input[[0, y, x, 1]] = f32::from(g);
+        input[[0, y, x, 2]] = f32::from(r);
+    }
+
+    Ok(input)
+}
+
 impl Interrogator {
     pub fn init(model_dir: &Path) -> Result<Self> {
         ensure!(
@@ -89,29 +115,13 @@ impl Interrogator {
         })
     }
 
-    pub fn interrogate(&self, original_image: &DynamicImage) -> InterrogateReturn {
+    pub fn interrogate(&self, image: &DynamicImage) -> InterrogateReturn {
         let size = self.model.inputs[0]
             .input_type
             .tensor_dimensions()
             .ok_or(anyhow!("No input tensor dimensions"))?[1];
-        let size = size as usize;
 
-        let image = original_image.resize_exact(
-            size as u32,
-            size as u32,
-            image::imageops::FilterType::CatmullRom,
-        );
-        let mut input = Array::zeros((1, size, size, 3));
-
-        for pixel in image.pixels() {
-            let x = pixel.0 as usize;
-            let y = pixel.1 as usize;
-            let [r, g, b, _] = pixel.2 .0;
-            input[[0, y, x, 0]] = b as f32;
-            input[[0, y, x, 1]] = g as f32;
-            input[[0, y, x, 2]] = r as f32;
-        }
-
+        let input = prepare_image(image, size.try_into()?)?;
         let input_name = &self.model.inputs[0].name;
         let time = Instant::now();
         let outputs = self.model.run(inputs![input_name => input.view()]?)?;
