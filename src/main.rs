@@ -186,6 +186,9 @@ fn main() -> Result<()> {
                 match search(&rt, &client, &tag_service) {
                     Ok(hashes) => {
                         let length = hashes.len();
+                        if hashes.is_empty() {
+                            info!("Nothing to tag");
+                        }
                         for (index, hash) in hashes.iter().enumerate() {
                             let time = Instant::now();
                             if let Err(e) = evaluate_hash(
