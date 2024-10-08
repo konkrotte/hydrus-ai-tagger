@@ -86,10 +86,10 @@ fn evaluate_hash(
         .into_par_iter()
         .filter(|(_, confidence)| *confidence > threshold)
         .map(|(tag, _)| {
-            if !KAOMOJIS.contains(&tag.as_str()) {
-                tag.replace('_', " ")
-            } else {
+            if KAOMOJIS.contains(&tag.as_str()) {
                 tag
+            } else {
+                tag.replace('_', " ")
             }
         })
         .collect();
@@ -98,7 +98,7 @@ fn evaluate_hash(
         let rating = ratings
             .par_iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(r, _)| format!("rating:{}", r))
+            .map(|(r, _)| format!("rating:{r}"))
             .ok_or_else(|| anyhow!("Ratings was empty"))?;
 
         filtered_tags.push(rating);
@@ -111,11 +111,11 @@ fn evaluate_hash(
 
     debug!("Tags to be added: {:?}", request.service_keys_to_tags);
 
-    if !dry_run {
+    if dry_run {
+        warn!("Not adding tags, because dry run");
+    } else {
         rt.block_on(client.add_tags(request))
             .context("Failed adding tags")?;
-    } else {
-        warn!("Not adding tags, because dry run");
     }
 
     Ok(())
@@ -145,8 +145,7 @@ fn main() -> Result<()> {
                         log::Level::Error => 3,
                         log::Level::Warn => 4,
                         log::Level::Info => 6,
-                        log::Level::Debug => 7,
-                        log::Level::Trace => 7,
+                        log::Level::Debug | log::Level::Trace => 7,
                     },
                     record.target(),
                     record.args()

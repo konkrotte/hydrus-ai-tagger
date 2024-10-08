@@ -54,8 +54,7 @@ where
         0 => Ok(false),
         1 => Ok(true),
         _ => Err(serde::de::Error::custom(format!(
-            "Invalid boolean value: {}",
-            x
+            "Invalid boolean value: {x}"
         ))),
     }
 }
@@ -138,7 +137,7 @@ impl Interrogator {
             let mut ratings = IndexMap::new();
             let mut regular_tags = IndexMap::new();
 
-            for (key, value) in result.into_iter() {
+            for (key, value) in result {
                 if ratings.len() < self.number_of_ratings {
                     ratings.insert(key, value);
                 } else {
