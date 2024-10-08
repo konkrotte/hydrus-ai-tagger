@@ -15,7 +15,7 @@ use hydrus_api::api_core::{
 };
 use image::load_from_memory;
 use interrogator::Interrogator;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use tokio::runtime::Runtime;
 
@@ -185,6 +185,7 @@ fn main() -> Result<()> {
                 match search(&rt, &client, &tag_service) {
                     Ok(hashes) => {
                         for hash in hashes {
+                            let time = Instant::now();
                             if let Err(e) = evaluate_hash(
                                 &rt,
                                 &client,
@@ -196,6 +197,7 @@ fn main() -> Result<()> {
                             ) {
                                 error!("Error evaluating hash: {:?}", e);
                             }
+                            debug!("Took {} s", time.elapsed().as_secs_f64())
                         }
                     }
                     Err(e) => error!("Search error: {:?}", e),

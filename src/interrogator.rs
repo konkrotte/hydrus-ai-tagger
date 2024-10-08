@@ -1,9 +1,9 @@
-use std::{fs, path::Path, thread};
+use std::{fs, path::Path, thread, time::Instant};
 
 use anyhow::{anyhow, ensure, Result};
 use image::{DynamicImage, GenericImageView};
 use indexmap::IndexMap;
-use log::info;
+use log::{debug, info};
 use ndarray::Array;
 use ort::{inputs, GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -114,7 +114,9 @@ impl Interrogator {
         }
 
         let input_name = &self.model.inputs[0].name;
+        let time = Instant::now();
         let outputs = self.model.run(inputs![input_name => input.view()]?)?;
+        debug!("Inference took {} s", time.elapsed().as_secs_f64());
         let output = &outputs[0];
         let confidences = output.try_extract_tensor::<f32>()?.to_owned();
         let mut result = IndexMap::new();
