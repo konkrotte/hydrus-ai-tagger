@@ -110,10 +110,8 @@ fn evaluate_hash(
         .build();
 
     debug!("Tags to be added: {:?}", request.service_keys_to_tags);
-    debug!("{:?}", request);
 
     if !dry_run {
-        // FIXME: broken
         rt.block_on(client.add_tags(request))
             .context("Failed adding tags")?;
     } else {
@@ -180,7 +178,7 @@ fn main() -> Result<()> {
                 .services
                 .par_iter()
                 .find_any(|x| x.1.name == tag_service)
-                .map(|x| x.1.name.to_owned())
+                .map(|x| x.0.to_owned())
                 .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
             loop {
                 let start_time = Instant::now();
