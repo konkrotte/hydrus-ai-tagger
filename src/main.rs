@@ -184,7 +184,8 @@ fn main() -> Result<()> {
 
                 match search(&rt, &client, &tag_service) {
                     Ok(hashes) => {
-                        for hash in hashes {
+                        let length = hashes.len();
+                        for (index, hash) in hashes.iter().enumerate() {
                             let time = Instant::now();
                             if let Err(e) = evaluate_hash(
                                 &rt,
@@ -197,7 +198,8 @@ fn main() -> Result<()> {
                             ) {
                                 error!("Error evaluating hash: {:?}", e);
                             }
-                            debug!("Took {} s", time.elapsed().as_secs_f64())
+                            debug!("Took {} s", time.elapsed().as_secs_f64());
+                            info!("{}/{} images completed", index, length);
                         }
                     }
                     Err(e) => error!("Search error: {:?}", e),
