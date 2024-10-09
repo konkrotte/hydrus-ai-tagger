@@ -1,5 +1,5 @@
 use std::{
-    io::Write,
+    io::{Cursor, Write},
     path,
     time::{Duration, Instant},
 };
@@ -13,7 +13,7 @@ use hydrus_api::api_core::{
         searching_and_fetching_files::{FileSearchOptions, SearchQueryEntry},
     },
 };
-use image::load_from_memory;
+use image::ImageReader;
 use indexmap::IndexMap;
 use interrogator::Interrogator;
 use log::{debug, error, info, warn};
@@ -81,8 +81,16 @@ fn tag_image(
         .block_on(client.get_file(FileIdentifier::hash(hash)))
         .context("Error calling Hydrus API")?;
 
-    let image = load_from_memory(&record.bytes)?;
-    let (ratings, tags) = interrogator.interrogate(&image)?;
+    let mut image = ImageReader::new(Cursor::new(&record.bytes));
+    image.no_limits();
+    let image = image
+        .with_guessed_format()?
+        .decode()
+        .context("Error decoding image")?;
+
+    let (ratings, tags) = interrogator
+        .interrogate(&image)
+        .context("Failed interrogating model")?;
 
     let mut filtered_tags = filter_and_process_tags(tags, threshold);
 
