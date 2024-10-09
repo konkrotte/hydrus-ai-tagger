@@ -14,6 +14,7 @@ use hydrus_api::api_core::{
     },
 };
 use image::load_from_memory;
+use indexmap::IndexMap;
 use interrogator::Interrogator;
 use log::{debug, error, info, warn};
 use rayon::prelude::*;
@@ -21,17 +22,16 @@ use tokio::runtime::Runtime;
 
 mod interrogator;
 
-const KAOMOJIS: &[&str] = &[
-    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
-    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
-];
-
 #[derive(Parser)]
 #[command(author, version, about)]
 struct Args {
     #[command(subcommand)]
     command: Commands,
 }
+
+const DEFAULT_THRESHOLD: f32 = 0.35;
+const DEFAULT_TAG_SERVICE: &str = "ai tags";
+const DEFAULT_INTERVAL: usize = 60;
 
 #[derive(Subcommand)]
 enum Commands {
@@ -41,15 +41,15 @@ enum Commands {
         model_dir: path::PathBuf,
 
         /// The threshold for a tag to be used
-        #[arg(long, default_value_t = 0.35)]
+        #[arg(long, default_value_t = DEFAULT_THRESHOLD)]
         threshold: f32,
 
         /// The tag service to use
-        #[arg(long, default_value_t = String::from("ai tags"))]
+        #[arg(long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
         tag_service: String,
 
         /// Time in minutes to sleep between searches
-        #[arg(long, default_value_t = 60)]
+        #[arg(long, default_value_t = DEFAULT_INTERVAL)]
         interval: usize,
 
         /// Access key for the Hydrus Client API
@@ -66,7 +66,7 @@ enum Commands {
     },
 }
 
-fn evaluate_hash(
+fn tag_image(
     rt: &Runtime,
     client: &hydrus_api::Client,
     interrogator: &Interrogator,
@@ -75,33 +75,19 @@ fn evaluate_hash(
     hash: &str,
     dry_run: bool,
 ) -> Result<()> {
-    debug!("Evaluating {}", hash);
+    debug!("Tagging {}", hash);
+
     let record = rt
         .block_on(client.get_file(FileIdentifier::hash(hash)))
         .context("Error calling Hydrus API")?;
+
     let image = load_from_memory(&record.bytes)?;
     let (ratings, tags) = interrogator.interrogate(&image)?;
 
-    let mut filtered_tags: Vec<String> = tags
-        .into_par_iter()
-        .filter(|(_, confidence)| *confidence > threshold)
-        .map(|(tag, _)| {
-            if KAOMOJIS.contains(&tag.as_str()) {
-                tag
-            } else {
-                tag.replace('_', " ")
-            }
-        })
-        .collect();
+    let mut filtered_tags = filter_and_process_tags(tags, threshold);
 
     if let Some(ratings) = ratings {
-        let rating = ratings
-            .par_iter()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(r, _)| format!("rating:{r}"))
-            .ok_or_else(|| anyhow!("Ratings was empty"))?;
-
-        filtered_tags.push(rating);
+        filtered_tags.push(get_rating(&ratings)?);
     }
 
     let request = AddTagsRequestBuilder::default()
@@ -121,7 +107,11 @@ fn evaluate_hash(
     Ok(())
 }
 
-fn search(rt: &Runtime, client: &hydrus_api::Client, tag_service: &str) -> Result<Vec<String>> {
+fn get_untagged_images(
+    rt: &Runtime,
+    client: &hydrus_api::Client,
+    tag_service: &str,
+) -> Result<Vec<String>> {
     let hashes = rt
         .block_on(client.search_file_hashes(
             vec![
@@ -134,7 +124,88 @@ fn search(rt: &Runtime, client: &hydrus_api::Client, tag_service: &str) -> Resul
     Ok(hashes)
 }
 
-fn main() -> Result<()> {
+fn tag_untagged_images(
+    rt: &Runtime,
+    client: &hydrus_api::Client,
+    tag_service: &str,
+    interrogator: &Interrogator,
+    threshold: f32,
+    service_key: &str,
+    dry_run: bool,
+) {
+    match get_untagged_images(rt, client, tag_service) {
+        Ok(hashes) => {
+            let length = hashes.len();
+            if hashes.is_empty() {
+                info!("Nothing to tag");
+            }
+            for (index, hash) in hashes.iter().enumerate() {
+                let time = Instant::now();
+                if let Err(e) = tag_image(
+                    rt,
+                    client,
+                    interrogator,
+                    threshold,
+                    service_key,
+                    hash,
+                    dry_run,
+                ) {
+                    error!("Error evaluating hash: {:?}", e);
+                }
+                debug!("Took {} s", time.elapsed().as_secs_f64());
+                info!("{}/{length} images completed", index + 1);
+            }
+        }
+        Err(e) => error!("Search error: {:?}", e),
+    }
+}
+
+fn get_tag_service_key_from_name(
+    rt: &Runtime,
+    client: &hydrus_api::Client,
+    tag_service: &String,
+) -> Result<String> {
+    let service_key = rt
+        .block_on(client.get_services())?
+        .services
+        .par_iter()
+        .find_any(|x| x.1.name == *tag_service)
+        .map(|x| x.0.to_owned())
+        .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
+    Ok(service_key)
+}
+
+/// Kaomoji tags to be excluded from the process of replacing '_' with space
+const KAOMOJIS: &[&str] = &[
+    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
+    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
+];
+
+pub fn get_rating(ratings: &IndexMap<String, f32>) -> Result<String> {
+    ratings
+        .par_iter()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(r, _)| format!("rating:{r}"))
+        .ok_or_else(|| anyhow!("Ratings was empty"))
+}
+
+pub fn filter_and_process_tags(
+    tags: indexmap::IndexMap<String, f32>,
+    threshold: f32,
+) -> Vec<String> {
+    tags.into_par_iter()
+        .filter(|(_, confidence)| *confidence > threshold)
+        .map(|(tag, _)| {
+            if KAOMOJIS.contains(&tag.as_str()) {
+                tag
+            } else {
+                tag.replace('_', " ")
+            }
+        })
+        .collect()
+}
+
+pub fn init_logger() {
     match std::env::var("RUST_LOG_STYLE") {
         Ok(s) if s == "SYSTEMD" => env_logger::builder()
             .format(|buf, record| {
@@ -154,7 +225,10 @@ fn main() -> Result<()> {
             .init(),
         _ => env_logger::init(),
     };
+}
 
+fn main() -> Result<()> {
+    init_logger();
     let args = Args::parse();
 
     match args.command {
@@ -172,41 +246,19 @@ fn main() -> Result<()> {
 
             let interval_duration = Duration::from_secs((interval * 60) as u64);
             let interrogator = Interrogator::init(&model_dir)?;
-            let service_key = rt
-                .block_on(client.get_services())?
-                .services
-                .par_iter()
-                .find_any(|x| x.1.name == tag_service)
-                .map(|x| x.0.to_owned())
-                .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
+            let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
             loop {
                 let start_time = Instant::now();
 
-                match search(&rt, &client, &tag_service) {
-                    Ok(hashes) => {
-                        let length = hashes.len();
-                        if hashes.is_empty() {
-                            info!("Nothing to tag");
-                        }
-                        for (index, hash) in hashes.iter().enumerate() {
-                            let time = Instant::now();
-                            if let Err(e) = evaluate_hash(
-                                &rt,
-                                &client,
-                                &interrogator,
-                                threshold,
-                                &service_key,
-                                hash,
-                                dry_run,
-                            ) {
-                                error!("Error evaluating hash: {:?}", e);
-                            }
-                            debug!("Took {} s", time.elapsed().as_secs_f64());
-                            info!("{}/{length} images completed", index + 1);
-                        }
-                    }
-                    Err(e) => error!("Search error: {:?}", e),
-                }
+                tag_untagged_images(
+                    &rt,
+                    &client,
+                    &tag_service,
+                    &interrogator,
+                    threshold,
+                    &service_key,
+                    dry_run,
+                );
 
                 let elapsed_time = start_time.elapsed();
                 if elapsed_time < interval_duration {
