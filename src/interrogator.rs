@@ -9,12 +9,9 @@ use indexmap::IndexMap;
 use log::{debug, info};
 use ndarray::{Array, Array4};
 use ort::{
-    inputs, CUDAExecutionProvider, CoreMLExecutionProvider, GraphOptimizationLevel, Session,
-    TensorRTExecutionProvider,
+    inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, TensorRTExecutionProvider,
 };
 use serde::{Deserialize, Deserializer, Serialize};
-
-use crate::Acceleration;
 
 type InterrogateReturn = Result<(Option<IndexMap<String, f32>>, IndexMap<String, f32>)>;
 
@@ -88,7 +85,7 @@ fn prepare_image(image: &DynamicImage, size: u32) -> Result<Array4<f32>> {
 }
 
 impl Interrogator {
-    pub fn init(model_dir: &Path, acceleration: &Acceleration) -> Result<Self> {
+    pub fn init(model_dir: &Path) -> Result<Self> {
         ensure!(
             model_dir.is_dir(),
             "Supplied model path does not exist or is not a directory"

@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use clap::{Parser, Subcommand, ValueEnum, ValueHint};
+use clap::{Parser, Subcommand, ValueHint};
 use hydrus_api::api_core::{
     common::FileIdentifier,
     endpoints::{
@@ -32,22 +32,6 @@ struct Args {
 const DEFAULT_THRESHOLD: f32 = 0.35;
 const DEFAULT_TAG_SERVICE: &str = "ai tags";
 const DEFAULT_INTERVAL: usize = 60;
-
-#[derive(Debug, Clone, ValueEnum)]
-enum Acceleration {
-    Cpu,
-    Cuda,
-    Tensorrt,
-}
-
-// impl ToString for Acceleration {
-//     fn to_string(&self) -> String {
-//         match self {
-//             Acceleration::Cpu => String::from("CPU"),
-//             Acceleration::Cuda => String::from("CUDA"),
-//         }
-//     }
-// }
 
 #[derive(Subcommand)]
 enum Commands {
@@ -79,10 +63,6 @@ enum Commands {
         /// Don't commit anything to Hydrus
         #[arg(short, long)]
         dry_run: bool,
-
-        /// Hardware acceleration
-        #[arg(value_enum, long, default_value_t = Acceleration::Cpu)]
-        acceleration: Acceleration,
     },
 }
 
@@ -99,7 +79,7 @@ fn tag_image(
 
     let record = rt
         .block_on(client.get_file(FileIdentifier::hash(hash)))
-        .context("Error calling Hydrus API")?;
+        .context("Error getting image file from Hydrus API")?;
 
     let mut image = ImageReader::new(Cursor::new(&record.bytes));
     image.no_limits();
@@ -268,13 +248,12 @@ fn main() -> Result<()> {
             access_key,
             host,
             dry_run,
-            acceleration,
         } => {
             let rt = Runtime::new()?;
             let client = hydrus_api::Client::new(host, access_key);
 
             let interval_duration = Duration::from_secs((interval * 60) as u64);
-            let interrogator = Interrogator::init(&model_dir, &acceleration)?;
+            let interrogator = Interrogator::init(&model_dir)?;
             let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
             loop {
                 let start_time = Instant::now();
