@@ -143,12 +143,10 @@ fn tag_untagged_images(
 ) {
     match get_untagged_images(rt, client, tag_service) {
         Ok(hashes) => {
-            let length = hashes.len();
             if hashes.is_empty() {
                 info!("Nothing to tag");
             }
-            for (index, hash) in hashes.iter().enumerate() {
-                let time = Instant::now();
+            hashes.par_iter().for_each(|hash| {
                 if let Err(e) = tag_image(
                     rt,
                     client,
@@ -160,9 +158,7 @@ fn tag_untagged_images(
                 ) {
                     error!("Error evaluating hash: {:?}", e);
                 }
-                debug!("Took {} s", time.elapsed().as_secs_f64());
-                info!("{}/{length} images completed", index + 1);
-            }
+            });
         }
         Err(e) => error!("Search error: {:?}", e),
     }
