@@ -91,7 +91,7 @@ fn tag_image(
         .or_else(|_| {
             warn!("Failed decoding original image, falling back to using hydrus render");
             let rendered = rt
-                .block_on(client.render_file(FileIdentifier::hash(hash)))
+                .block_on(client.get_render(FileIdentifier::hash(hash)))
                 .context("Error rendering file")?;
             decode_image(&rendered.bytes)
         })
