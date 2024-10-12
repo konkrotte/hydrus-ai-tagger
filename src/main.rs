@@ -13,7 +13,7 @@ use hydrus_api::api_core::{
         searching_and_fetching_files::{FileSearchOptions, SearchQueryEntry},
     },
 };
-use image::ImageReader;
+use image::{DynamicImage, ImageReader};
 use indexmap::IndexMap;
 use interrogator::Interrogator;
 use log::{debug, error, info, warn};
@@ -66,6 +66,12 @@ enum Commands {
     },
 }
 
+fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
+    let mut reader = ImageReader::new(Cursor::new(bytes));
+    reader.no_limits();
+    reader.with_guessed_format()?.decode().map_err(Into::into)
+}
+
 fn tag_image(
     rt: &Runtime,
     client: &hydrus_api::Client,
@@ -81,12 +87,15 @@ fn tag_image(
         .block_on(client.get_file(FileIdentifier::hash(hash)))
         .context("Error getting image file from Hydrus API")?;
 
-    let mut image = ImageReader::new(Cursor::new(&record.bytes));
-    image.no_limits();
-    let image = image
-        .with_guessed_format()?
-        .decode()
-        .context("Error decoding image")?;
+    let image = decode_image(&record.bytes)
+        .or_else(|_| {
+            warn!("Failed decoding original image, falling back to using hydrus render");
+            let rendered = rt
+                .block_on(client.render_file(FileIdentifier::hash(hash)))
+                .context("Error rendering file")?;
+            decode_image(&rendered.bytes)
+        })
+        .context("Failed to decode image")?;
 
     let (ratings, tags) = interrogator
         .interrogate(&image)

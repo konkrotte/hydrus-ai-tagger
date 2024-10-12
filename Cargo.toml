@@ -8,7 +8,9 @@ anyhow = "1.0.89"
 clap = { version = "4.5.20", features = ["derive"] }
 csv = "1.3.0"
 env_logger = "0.11.5"
-hydrus-api = { version = "0.10.2", features = ["rustls"] }
+hydrus-api = { git = "https://git.dimlight.eu/konkrotte/hydrus-api-rs.git", branch = "develop", features = [
+    "rustls",
+] }
 image = "0.25.2"
 indexmap = { version = "2.6.0", features = ["rayon"] }
 log = "0.4.22"
