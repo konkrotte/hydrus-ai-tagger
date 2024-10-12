@@ -1,5 +1,5 @@
 use std::{
-    io::{Cursor, Write},
+    io::Cursor,
     path,
     sync::Arc,
     time::{Duration, Instant},
@@ -224,30 +224,8 @@ pub fn filter_and_process_tags(
         .collect()
 }
 
-pub fn init_logger() {
-    match std::env::var("RUST_LOG_STYLE") {
-        Ok(s) if s == "SYSTEMD" => env_logger::builder()
-            .format(|buf, record| {
-                writeln!(
-                    buf,
-                    "<{}>{}: {}",
-                    match record.level() {
-                        log::Level::Error => 3,
-                        log::Level::Warn => 4,
-                        log::Level::Info => 6,
-                        log::Level::Debug | log::Level::Trace => 7,
-                    },
-                    record.target(),
-                    record.args()
-                )
-            })
-            .init(),
-        _ => env_logger::init(),
-    };
-}
-
 fn main() -> Result<()> {
-    init_logger();
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     match args.command {
