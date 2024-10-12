@@ -1,6 +1,7 @@
 use std::{
     io::{Cursor, Write},
     path,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -74,8 +75,8 @@ fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
 
 fn tag_image(
     rt: &Runtime,
-    client: &hydrus_api::Client,
-    interrogator: &Interrogator,
+    client: Arc<&hydrus_api::Client>,
+    interrogator: Arc<&Interrogator>,
     threshold: f32,
     service_key: &str,
     hash: &str,
@@ -154,12 +155,17 @@ fn tag_untagged_images(
         Ok(hashes) => {
             if hashes.is_empty() {
                 info!("Nothing to tag");
+                return;
             }
+
+            let client = Arc::new(client);
+            let interrogator = Arc::new(interrogator);
+
             hashes.par_iter().for_each(|hash| {
                 if let Err(e) = tag_image(
                     rt,
-                    client,
-                    interrogator,
+                    client.clone(),
+                    interrogator.clone(),
                     threshold,
                     service_key,
                     hash,
