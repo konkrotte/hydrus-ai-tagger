@@ -75,8 +75,8 @@ fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
 
 fn tag_image(
     rt: &Runtime,
-    client: Arc<&hydrus_api::Client>,
-    interrogator: Arc<&Interrogator>,
+    client: Arc<hydrus_api::Client>,
+    interrogator: Arc<Interrogator>,
     threshold: f32,
     service_key: &str,
     hash: &str,
@@ -133,7 +133,7 @@ fn get_untagged_images(
     let hashes = rt
         .block_on(client.search_file_hashes(
             vec![
-                SearchQueryEntry::Tag(String::from("system:untagged")),
+                SearchQueryEntry::Tag(String::from("system:limit is 20")),
                 SearchQueryEntry::Tag(String::from("system:filetype is image")),
             ],
             FileSearchOptions::new().tag_service_name(tag_service.to_string()),
@@ -144,22 +144,19 @@ fn get_untagged_images(
 
 fn tag_untagged_images(
     rt: &Runtime,
-    client: &hydrus_api::Client,
+    client: Arc<hydrus_api::Client>,
     tag_service: &str,
-    interrogator: &Interrogator,
+    interrogator: Arc<Interrogator>,
     threshold: f32,
     service_key: &str,
     dry_run: bool,
 ) {
-    match get_untagged_images(rt, client, tag_service) {
+    match get_untagged_images(rt, &client, tag_service) {
         Ok(hashes) => {
             if hashes.is_empty() {
                 info!("Nothing to tag");
                 return;
             }
-
-            let client = Arc::new(client);
-            let interrogator = Arc::new(interrogator);
 
             hashes.par_iter().for_each(|hash| {
                 if let Err(e) = tag_image(
@@ -239,19 +236,20 @@ fn main() -> Result<()> {
             dry_run,
         } => {
             let rt = Runtime::new()?;
-            let client = hydrus_api::Client::new(host, access_key);
+            let client = Arc::new(hydrus_api::Client::new(host, access_key));
 
             let interval_duration = Duration::from_secs((interval * 60) as u64);
-            let interrogator = Interrogator::init(&model_dir)?;
+            let interrogator = Arc::new(Interrogator::init(&model_dir)?);
             let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
+
             loop {
                 let start_time = Instant::now();
 
                 tag_untagged_images(
                     &rt,
-                    &client,
+                    client.clone(),
                     &tag_service,
-                    &interrogator,
+                    interrogator.clone(),
                     threshold,
                     &service_key,
                     dry_run,
