@@ -22,7 +22,6 @@ tokio = { version = "1.40.0", features = ["rt-multi-thread"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 [profile.release]
-target-feature = "+avx2"
 lto = true
-codegen-unit = 1
+codegen-units = 1
 panic = "abort"
