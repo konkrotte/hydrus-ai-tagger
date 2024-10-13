@@ -38,31 +38,31 @@ const DEFAULT_INTERVAL: usize = 60;
 enum Commands {
     Daemon {
         /// Path to the model folder
-        #[arg(long, value_hint = ValueHint::DirPath)]
+        #[arg(env, long, value_hint = ValueHint::DirPath)]
         model_dir: path::PathBuf,
 
         /// The threshold for a tag to be used
-        #[arg(long, default_value_t = DEFAULT_THRESHOLD)]
+        #[arg(env, long, default_value_t = DEFAULT_THRESHOLD)]
         threshold: f32,
 
         /// The tag service to use
-        #[arg(long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
+        #[arg(env, long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
         tag_service: String,
 
         /// Time in minutes to sleep between searches
-        #[arg(long, default_value_t = DEFAULT_INTERVAL)]
+        #[arg(env, long, default_value_t = DEFAULT_INTERVAL)]
         interval: usize,
 
         /// Access key for the Hydrus Client API
-        #[arg(long)]
+        #[arg(env, long)]
         access_key: String,
 
         /// URL for the Hydrus Client API server
-        #[arg(long)]
+        #[arg(env, long)]
         host: String,
 
         /// Don't commit anything to Hydrus
-        #[arg(short, long)]
+        #[arg(env, short, long)]
         dry_run: bool,
     },
 }
