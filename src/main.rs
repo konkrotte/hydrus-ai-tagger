@@ -133,7 +133,7 @@ fn get_untagged_images(
     let hashes = rt
         .block_on(client.search_file_hashes(
             vec![
-                SearchQueryEntry::Tag(String::from("system:limit is 20")),
+                SearchQueryEntry::Tag(String::from("system:untagged")),
                 SearchQueryEntry::Tag(String::from("system:filetype is image")),
             ],
             FileSearchOptions::new().tag_service_name(tag_service.to_string()),
