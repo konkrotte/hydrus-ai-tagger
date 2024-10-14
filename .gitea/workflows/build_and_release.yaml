@@ -190,7 +190,7 @@ jobs:
 
       - uses: taiki-e/create-gh-release-action@v1
         with:
-          token: ${{ secrets.GITEA_TOKEN }}
+          token: ${{ secrets.TOKEN }}
           changelog: CHANGELOG.md
           allow-missing-changelog: true
           ref: refs/tags/${{ needs.get-version.outputs.new_tag_version }}
@@ -262,6 +262,6 @@ jobs:
           target: ${{ matrix.target }}
           include: attribution
           archive: $bin-$tag-$target
-          token: ${{ secrets.GITEA_TOKEN }}
+          token: ${{ secrets.TOKEN }}
           ref: refs/tags/${{  needs.get-version.outputs.new_tag_version }}
           checksum: sha256

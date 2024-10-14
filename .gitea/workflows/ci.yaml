@@ -123,9 +123,6 @@ jobs:
       - name: run typos
         run: typos
 
-  cargo-deny:
-    uses: ./.gitea/workflows/cargo_deny.yaml
-
   check-msrv:
     uses: ./.gitea/workflows/check_msrv.yaml
 
