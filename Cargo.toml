@@ -2,6 +2,9 @@
 name = "hydrus-ai-tagger"
 version = "0.1.0"
 edition = "2021"
+license = "WTFPL"
+repository = "https://git.dimlight.eu/konkrotte/hydrus-ai-tagger"
+rust-version = "1.81.0"
 
 [dependencies]
 anyhow = "1.0.89"
