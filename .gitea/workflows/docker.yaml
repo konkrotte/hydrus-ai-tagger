@@ -3,9 +3,6 @@ name: Build and Push Docker Image
 on:
   push:
     branches: ["master"]
-    secrets:
-      token:
-        required: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
