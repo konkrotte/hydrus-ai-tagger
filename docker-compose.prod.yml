@@ -1,0 +1,18 @@
+services:
+  hydrus-ai-tagger:
+    image: git.dimlight.eu/konkrotte/hydrus-ai-tagger
+    environment:
+      - MODEL_DIR=/models/wd-vit-tagger-v3
+      - INTERVAL=5
+      - HOST=http://127.0.0.1:45869
+      - ACCESS_KEY=12345
+      - RUST_LOG=info
+    volumes:
+      - /my/models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]

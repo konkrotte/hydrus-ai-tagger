@@ -1,0 +1,11 @@
+services:
+  hydrus-ai-tagger:
+    platform: "linux/amd64"
+    build:
+      context: .
+    environment:
+      - RUST_LOG=debug
+    volumes:
+      - ./models:/models
+    env_file:
+      - hydrus-ai-tagger.env
