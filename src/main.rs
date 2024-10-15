@@ -128,7 +128,7 @@ fn tag_image(
 fn get_untagged_images(
     rt: &Runtime,
     client: &hydrus_api::Client,
-    tag_service: &str,
+    service_key: &str,
 ) -> Result<Vec<String>> {
     let hashes = rt
         .block_on(client.search_file_hashes(
@@ -136,7 +136,7 @@ fn get_untagged_images(
                 SearchQueryEntry::Tag(String::from("system:untagged")),
                 SearchQueryEntry::Tag(String::from("system:filetype is image")),
             ],
-            FileSearchOptions::new().tag_service_name(tag_service.to_string()),
+            FileSearchOptions::new().tag_service_key(service_key.to_string()),
         ))?
         .hashes;
     Ok(hashes)
@@ -145,13 +145,12 @@ fn get_untagged_images(
 fn tag_untagged_images(
     rt: &Runtime,
     client: Arc<hydrus_api::Client>,
-    tag_service: &str,
     interrogator: Arc<Interrogator>,
     threshold: f32,
     service_key: &str,
     dry_run: bool,
 ) {
-    match get_untagged_images(rt, &client, tag_service) {
+    match get_untagged_images(rt, &client, service_key) {
         Ok(hashes) => {
             if hashes.is_empty() {
                 info!("Nothing to tag");
@@ -248,7 +247,6 @@ fn main() -> Result<()> {
                 tag_untagged_images(
                     &rt,
                     client.clone(),
-                    &tag_service,
                     interrogator.clone(),
                     threshold,
                     &service_key,
