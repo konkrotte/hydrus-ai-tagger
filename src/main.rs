@@ -1,5 +1,6 @@
 use std::{
     fmt::Write,
+    io::IsTerminal,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -51,15 +52,6 @@ impl App {
                     },
                 target_images,
             } => {
-                tracing_subscriber::fmt()
-                    .pretty()
-                    .with_thread_names(false)
-                    .with_max_level(tracing::Level::WARN)
-                    .with_line_number(false)
-                    .without_time()
-                    .with_file(false)
-                    .init();
-
                 let client = Arc::new(hydrus_api::Client::new(host, access_key));
                 let interrogator = Arc::new(Interrogator::init(model_dir)?);
                 let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
@@ -120,8 +112,6 @@ impl App {
                     },
                 interval,
             } => {
-                tracing_subscriber::fmt::init();
-
                 let interval_duration = Duration::from_secs((interval * 60) as u64);
                 let client = Arc::new(hydrus_api::Client::new(host, access_key));
                 let interrogator = Arc::new(Interrogator::init(model_dir)?);
@@ -159,6 +149,21 @@ impl App {
 }
 
 fn main() -> Result<()> {
+    match std::io::stdout().is_terminal() {
+        true => tracing_subscriber::fmt()
+            .pretty()
+            .with_thread_names(false)
+            .with_max_level(tracing::Level::WARN)
+            .with_line_number(false)
+            .without_time()
+            .with_file(false)
+            .with_writer(std::io::stderr)
+            .init(),
+        false => tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .init(),
+    }
+
     let args = Args::parse();
 
     let app = App::new(args)?;
