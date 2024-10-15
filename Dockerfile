@@ -20,11 +20,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip && \
 RUN pip3 install onnxruntime-gpu --break-system-packages
 
 COPY --from=build /bin/rustapp /bin/rustapp
-RUN echo '#!/bin/bash\n\
-    export ORT_DYLIB_PATH=$(find /usr/local/lib -name "libonnxruntime.so*" | head -n 1)\n\
-    export ORT_STRATEGY=system\n\
-    exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
 
-ENV ORT_STRATEGY=system
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["rustapp", "daemon"]
