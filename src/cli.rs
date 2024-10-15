@@ -30,12 +30,29 @@ pub struct CommonArgs {
     pub access_key: String,
 
     /// URL for the Hydrus Client API server
-    #[arg(env, long)]
+    #[arg(env, long, value_hint = ValueHint::Url)]
     pub host: String,
 
     /// Don't commit anything to Hydrus
     #[arg(env, short, long)]
     pub dry_run: bool,
+}
+
+#[derive(clap::Args)]
+#[group(required = true, multiple = false)]
+#[clap()]
+pub struct TargetImages {
+    /// Path to text file containing new-line separated list of hashes
+    #[arg(long, value_hint = ValueHint::FilePath)]
+    pub file: Option<path::PathBuf>,
+
+    /// Hashes to evaluate
+    #[arg(long)]
+    pub hashes: Option<Vec<String>>,
+
+    /// Tag images that are untagged in the provided tag service
+    #[arg(long)]
+    pub automatic: Option<bool>,
 }
 
 #[derive(Subcommand)]
@@ -44,9 +61,8 @@ pub enum Commands {
         #[command(flatten)]
         common: CommonArgs,
 
-        /// Hashes to evaluate
-        #[arg(long)]
-        hashes: Vec<String>,
+        #[clap(flatten)]
+        target_images: TargetImages,
     },
     Daemon {
         #[command(flatten)]

@@ -1,284 +1,165 @@
 use std::{
-    io::Cursor,
-    path,
+    fmt::Write,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use cli::*;
-use hydrus_api::api_core::{
-    common::FileIdentifier,
-    endpoints::{
-        adding_tags::AddTagsRequestBuilder,
-        searching_and_fetching_files::{FileSearchOptions, SearchQueryEntry},
-    },
+use indicatif::{
+    HumanDuration, ParallelProgressIterator, ProgressBar, ProgressState, ProgressStyle,
 };
-use image::{DynamicImage, ImageReader};
-use indexmap::IndexMap;
 use interrogator::Interrogator;
-use log::{debug, error, info, warn};
-use rayon::prelude::*;
+use log::{error, info, warn};
+use rayon::{prelude::*, vec};
+use tagger::Tagger;
 use tokio::runtime::Runtime;
+use utils::parse_hashes_file;
 
 mod cli;
 mod interrogator;
+mod tagger;
+mod utils;
 
 const DEFAULT_THRESHOLD: f32 = 0.35;
 const DEFAULT_TAG_SERVICE: &str = "ai tags";
 const DEFAULT_INTERVAL: usize = 60;
 
-/// Kaomoji tags to be excluded from the process of replacing '_' with space
-const KAOMOJIS: &[&str] = &[
-    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
-    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
-];
-
-fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
-    let mut reader = ImageReader::new(Cursor::new(bytes));
-    reader.no_limits();
-    reader.with_guessed_format()?.decode().map_err(Into::into)
+struct App {
+    rt: Arc<Runtime>,
+    args: Args,
 }
 
-fn tag_image(
-    rt: &Runtime,
-    client: Arc<hydrus_api::Client>,
-    interrogator: Arc<Interrogator>,
-    threshold: f32,
-    service_key: &str,
-    hash: &str,
-    dry_run: bool,
-) -> Result<()> {
-    debug!("Tagging {}", hash);
-
-    let record = rt
-        .block_on(client.get_file(FileIdentifier::hash(hash)))
-        .context("Error getting image file from Hydrus API")?;
-
-    let image = decode_image(&record.bytes)
-        .or_else(|_| {
-            warn!("Failed decoding original image, falling back to using hydrus render");
-            let rendered = rt
-                .block_on(client.get_render(FileIdentifier::hash(hash)))
-                .context("Error rendering file")?;
-            decode_image(&rendered.bytes)
+impl App {
+    fn new(args: Args) -> Result<Self> {
+        Ok(Self {
+            rt: Arc::new(Runtime::new()?),
+            args,
         })
-        .context("Failed to decode image")?;
-
-    let (ratings, tags) = interrogator
-        .interrogate(&image)
-        .context("Failed interrogating model")?;
-
-    let mut filtered_tags = filter_and_process_tags(tags, threshold);
-
-    if let Some(ratings) = ratings {
-        filtered_tags.push(get_rating(&ratings)?);
     }
 
-    let request = AddTagsRequestBuilder::default()
-        .add_hash(hash)
-        .add_tags(service_key.to_string(), filtered_tags)
-        .build();
+    fn run(&self) -> Result<()> {
+        match &self.args.command {
+            Commands::Eval {
+                common:
+                    CommonArgs {
+                        model_dir,
+                        threshold,
+                        tag_service,
+                        access_key,
+                        host,
+                        dry_run,
+                    },
+                target_images,
+            } => {
+                tracing_subscriber::fmt()
+                    .pretty()
+                    .with_thread_names(false)
+                    .with_max_level(tracing::Level::WARN)
+                    .with_line_number(false)
+                    .without_time()
+                    .with_file(false)
+                    .init();
 
-    debug!("Tags to be added: {:?}", request.service_keys_to_tags);
+                let client = Arc::new(hydrus_api::Client::new(host, access_key));
+                let interrogator = Arc::new(Interrogator::init(model_dir)?);
+                let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
+                let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
 
-    if dry_run {
-        warn!("Not adding tags, because dry run");
-    } else {
-        rt.block_on(client.add_tags(request))
-            .context("Failed adding tags")?;
-    }
+                let hashes = if let Some(hashes) = &target_images.hashes {
+                    hashes
+                } else if let Some(file_path) = &target_images.file {
+                    &parse_hashes_file(file_path)?
+                } else if let Some(_) = target_images.automatic {
+                    &tagger.get_untagged_images(&service_key)?
+                } else {
+                    return Ok(());
+                };
 
-    Ok(())
-}
+                let style = ProgressStyle::with_template(
+                    "[{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
+                )
+                .unwrap()
+                .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
+                    write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+                })
+                .progress_chars("#>-");
 
-fn get_untagged_images(
-    rt: &Runtime,
-    client: &hydrus_api::Client,
-    service_key: &str,
-) -> Result<Vec<String>> {
-    let hashes = rt
-        .block_on(client.search_file_hashes(
-            vec![
-                SearchQueryEntry::Tag(String::from("system:untagged")),
-                SearchQueryEntry::Tag(String::from("system:filetype is image")),
-            ],
-            FileSearchOptions::new().tag_service_key(service_key.to_string()),
-        ))?
-        .hashes;
-    Ok(hashes)
-}
-
-fn tag_untagged_images(
-    rt: &Runtime,
-    client: Arc<hydrus_api::Client>,
-    interrogator: Arc<Interrogator>,
-    threshold: f32,
-    service_key: &str,
-    dry_run: bool,
-) {
-    match get_untagged_images(rt, &client, service_key) {
-        Ok(hashes) => {
-            if hashes.is_empty() {
-                info!("Nothing to tag");
-                return;
-            }
-
-            hashes.par_iter().for_each(|hash| {
-                if let Err(e) = tag_image(
-                    rt,
-                    client.clone(),
-                    interrogator.clone(),
-                    threshold,
-                    service_key,
-                    hash,
-                    dry_run,
-                ) {
-                    error!("Error evaluating hash: {:?}", e);
+                if *dry_run {
+                    warn!("Not actually adding tags");
                 }
-            });
-        }
-        Err(e) => error!("Search error: {:?}", e),
-    }
-}
 
-fn tag_images(
-    rt: &Runtime,
-    client: Arc<hydrus_api::Client>,
-    hashes: Vec<String>,
-    interrogator: Arc<Interrogator>,
-    threshold: f32,
-    service_key: &str,
-    dry_run: bool,
-) {
-    hashes.par_iter().for_each(|hash| {
-        if let Err(e) = tag_image(
-            rt,
-            client.clone(),
-            interrogator.clone(),
-            threshold,
-            service_key,
-            hash,
-            dry_run,
-        ) {
-            eprintln!("Error evaluating hash: {:?}", e);
-        }
-    });
-}
+                let start_time = Instant::now();
 
-fn get_tag_service_key_from_name(
-    rt: &Runtime,
-    client: &hydrus_api::Client,
-    tag_service: &String,
-) -> Result<String> {
-    let service_key = rt
-        .block_on(client.get_services())?
-        .services
-        .par_iter()
-        .find_any(|x| x.1.name == *tag_service)
-        .map(|x| x.0.to_owned())
-        .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
-    Ok(service_key)
-}
+                println!("Tagging images");
+                hashes
+                    .par_iter()
+                    .progress_with_style(style)
+                    .for_each(|hash| {
+                        if let Err(e) = tagger.tag_image(&service_key, hash, *dry_run) {
+                            error!("Error evaluating hash: {:?}", e);
+                            return;
+                        }
+                    });
 
-pub fn get_rating(ratings: &IndexMap<String, f32>) -> Result<String> {
-    ratings
-        .par_iter()
-        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(r, _)| format!("rating:{r}"))
-        .ok_or_else(|| anyhow!("Ratings was empty"))
-}
+                println!("Done in {}", HumanDuration(start_time.elapsed()));
 
-pub fn filter_and_process_tags(
-    tags: indexmap::IndexMap<String, f32>,
-    threshold: f32,
-) -> Vec<String> {
-    tags.into_par_iter()
-        .filter(|(_, confidence)| *confidence > threshold)
-        .map(|(tag, _)| {
-            if KAOMOJIS.contains(&tag.as_str()) {
-                tag
-            } else {
-                tag.replace('_', " ")
+                Ok(())
             }
-        })
-        .collect()
+            Commands::Daemon {
+                common:
+                    CommonArgs {
+                        model_dir,
+                        threshold,
+                        tag_service,
+                        access_key,
+                        host,
+                        dry_run,
+                    },
+                interval,
+            } => {
+                tracing_subscriber::fmt::init();
+
+                let interval_duration = Duration::from_secs((interval * 60) as u64);
+                let client = Arc::new(hydrus_api::Client::new(host, access_key));
+                let interrogator = Arc::new(Interrogator::init(model_dir)?);
+                let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
+                let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
+
+                loop {
+                    let start_time = Instant::now();
+
+                    match tagger.get_untagged_images(&service_key) {
+                        Ok(hashes) => {
+                            if hashes.is_empty() {
+                                info!("Nothing to tag");
+                            }
+
+                            hashes.par_iter().for_each(|hash| {
+                                if let Err(e) = tagger.tag_image(&service_key, hash, *dry_run) {
+                                    error!("Error evaluating hash: {:?}", e);
+                                }
+                            });
+                        }
+                        Err(e) => error!("Search error: {:?}", e),
+                    }
+
+                    let elapsed_time = start_time.elapsed();
+                    if elapsed_time < interval_duration {
+                        let sleep_duration = interval_duration - elapsed_time;
+                        info!("Sleeping for {:?}", sleep_duration);
+                        std::thread::sleep(sleep_duration);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    match args.command {
-        Commands::Eval {
-            common:
-                CommonArgs {
-                    model_dir,
-                    threshold,
-                    tag_service,
-                    access_key,
-                    host,
-                    dry_run,
-                },
-            hashes,
-        } => {
-            let rt = Runtime::new()?;
-            let client = Arc::new(hydrus_api::Client::new(host, access_key));
-
-            let interrogator = Arc::new(Interrogator::init(&model_dir)?);
-            let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
-
-            tag_images(
-                &rt,
-                client,
-                hashes,
-                interrogator,
-                threshold,
-                &service_key,
-                dry_run,
-            );
-
-            Ok(())
-        }
-        Commands::Daemon {
-            common:
-                CommonArgs {
-                    model_dir,
-                    threshold,
-                    tag_service,
-                    access_key,
-                    host,
-                    dry_run,
-                },
-            interval,
-        } => {
-            let rt = Runtime::new()?;
-            let client = Arc::new(hydrus_api::Client::new(host, access_key));
-
-            let interval_duration = Duration::from_secs((interval * 60) as u64);
-            let interrogator = Arc::new(Interrogator::init(&model_dir)?);
-            let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
-
-            loop {
-                let start_time = Instant::now();
-
-                tag_untagged_images(
-                    &rt,
-                    client.clone(),
-                    interrogator.clone(),
-                    threshold,
-                    &service_key,
-                    dry_run,
-                );
-
-                let elapsed_time = start_time.elapsed();
-                if elapsed_time < interval_duration {
-                    let sleep_duration = interval_duration - elapsed_time;
-                    info!("Sleeping for {:?}", sleep_duration);
-                    std::thread::sleep(sleep_duration);
-                }
-            }
-        }
-    }
+    let app = App::new(args)?;
+    app.run()
 }
