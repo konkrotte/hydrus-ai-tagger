@@ -100,12 +100,9 @@ impl App {
                 hashes
                     .par_iter()
                     .progress_with_style(style)
-                    .for_each(|hash| {
-                        if let Err(e) = tagger.tag_image(&service_key, hash, *dry_run) {
-                            error!("Error evaluating hash: {:?}", e);
-                            return;
-                        }
-                    });
+                    .try_for_each(|hash| {
+                        tagger.tag_image(&service_key, hash, *dry_run).map(|_| ())
+                    })?;
 
                 println!("Done in {}", HumanDuration(start_time.elapsed()));
 
