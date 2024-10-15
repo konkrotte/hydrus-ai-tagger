@@ -45,7 +45,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: git.dimlight.eu/konkrotte/hydrus-ai-tagger:latest
           platforms: linux/amd64 # linux/arm64 doesn't work because onnxruntime-gpu is not available
           cache-from: type=local,src=/tmp/.buildx-cache
