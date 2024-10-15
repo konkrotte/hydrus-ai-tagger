@@ -6,7 +6,8 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use clap::{Parser, Subcommand, ValueHint};
+use clap::Parser;
+use cli::*;
 use hydrus_api::api_core::{
     common::FileIdentifier,
     endpoints::{
@@ -21,65 +22,13 @@ use log::{debug, error, info, warn};
 use rayon::prelude::*;
 use tokio::runtime::Runtime;
 
+mod cli;
 mod interrogator;
-
-#[derive(Parser)]
-#[command(author, version, about)]
-struct Args {
-    #[command(subcommand)]
-    command: Commands,
-}
 
 const DEFAULT_THRESHOLD: f32 = 0.35;
 const DEFAULT_TAG_SERVICE: &str = "ai tags";
 const DEFAULT_INTERVAL: usize = 60;
 
-#[derive(Parser)]
-struct CommonArgs {
-    /// Path to the model folder
-    #[arg(env, long, value_hint = ValueHint::DirPath)]
-    model_dir: path::PathBuf,
-
-    /// The threshold for a tag to be used
-    #[arg(env, long, default_value_t = DEFAULT_THRESHOLD)]
-    threshold: f32,
-
-    /// The tag service to use
-    #[arg(env, long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
-    tag_service: String,
-
-    /// Access key for the Hydrus Client API
-    #[arg(env, long)]
-    access_key: String,
-
-    /// URL for the Hydrus Client API server
-    #[arg(env, long)]
-    host: String,
-
-    /// Don't commit anything to Hydrus
-    #[arg(env, short, long)]
-    dry_run: bool,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    Eval {
-        #[command(flatten)]
-        common: CommonArgs,
-
-        /// Hashes to evaluate
-        #[arg(long)]
-        hashes: Vec<String>,
-    },
-    Daemon {
-        #[command(flatten)]
-        common: CommonArgs,
-
-        /// Time in minutes to sleep between searches
-        #[arg(env, long, default_value_t = DEFAULT_INTERVAL)]
-        interval: usize,
-    },
-}
 
 fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
     let mut reader = ImageReader::new(Cursor::new(bytes));
