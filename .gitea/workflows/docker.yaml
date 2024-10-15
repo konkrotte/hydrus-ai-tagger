@@ -41,13 +41,37 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image - CPU
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: git.dimlight.eu/konkrotte/hydrus-ai-tagger:latest
-          platforms: linux/amd64 # linux/arm64 doesn't work because onnxruntime-gpu is not available
+          tags: ${{ secrets.CONTAINER_REGISTRY }}/hydrus-ai-tagger:master-cpu
+          target: cpu
+          platforms: linux/amd64, linux/arm64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      # linux/arm64 doesn't work because onnxruntime-gpu is not available
+      - name: Build and push Docker image - CUDA
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.CONTAINER_REGISTRY }}/hydrus-ai-tagger:master-cuda
+          target: cuda
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+
+      - name: Build and push Docker image - TensorRT
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.CONTAINER_REGISTRY }}/hydrus-ai-tagger:master-tensorrt
+          target: tensorrt
+          platforms: linux/amd64
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 

@@ -1,6 +1,6 @@
 services:
   hydrus-ai-tagger:
-    image: git.dimlight.eu/konkrotte/hydrus-ai-tagger
+    image: git.dimlight.eu/konkrotte/hydrus-ai-tagger:tensorrt
     environment:
       - MODEL_DIR=/models/wd-vit-tagger-v3
       - INTERVAL=5

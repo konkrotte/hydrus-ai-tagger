@@ -3,6 +3,7 @@ services:
     platform: "linux/amd64"
     build:
       context: .
+      target: cpu
     environment:
       - RUST_LOG=debug
     volumes:
