@@ -34,36 +34,50 @@ const DEFAULT_THRESHOLD: f32 = 0.35;
 const DEFAULT_TAG_SERVICE: &str = "ai tags";
 const DEFAULT_INTERVAL: usize = 60;
 
+#[derive(Parser)]
+struct CommonArgs {
+    /// Path to the model folder
+    #[arg(env, long, value_hint = ValueHint::DirPath)]
+    model_dir: path::PathBuf,
+
+    /// The threshold for a tag to be used
+    #[arg(env, long, default_value_t = DEFAULT_THRESHOLD)]
+    threshold: f32,
+
+    /// The tag service to use
+    #[arg(env, long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
+    tag_service: String,
+
+    /// Access key for the Hydrus Client API
+    #[arg(env, long)]
+    access_key: String,
+
+    /// URL for the Hydrus Client API server
+    #[arg(env, long)]
+    host: String,
+
+    /// Don't commit anything to Hydrus
+    #[arg(env, short, long)]
+    dry_run: bool,
+}
+
 #[derive(Subcommand)]
 enum Commands {
+    Eval {
+        #[command(flatten)]
+        common: CommonArgs,
+
+        /// Hashes to evaluate
+        #[arg(long)]
+        hashes: Vec<String>,
+    },
     Daemon {
-        /// Path to the model folder
-        #[arg(env, long, value_hint = ValueHint::DirPath)]
-        model_dir: path::PathBuf,
-
-        /// The threshold for a tag to be used
-        #[arg(env, long, default_value_t = DEFAULT_THRESHOLD)]
-        threshold: f32,
-
-        /// The tag service to use
-        #[arg(env, long, default_value_t = String::from(DEFAULT_TAG_SERVICE))]
-        tag_service: String,
+        #[command(flatten)]
+        common: CommonArgs,
 
         /// Time in minutes to sleep between searches
         #[arg(env, long, default_value_t = DEFAULT_INTERVAL)]
         interval: usize,
-
-        /// Access key for the Hydrus Client API
-        #[arg(env, long)]
-        access_key: String,
-
-        /// URL for the Hydrus Client API server
-        #[arg(env, long)]
-        host: String,
-
-        /// Don't commit anything to Hydrus
-        #[arg(env, short, long)]
-        dry_run: bool,
     },
 }
 
@@ -175,6 +189,30 @@ fn tag_untagged_images(
     }
 }
 
+fn tag_images(
+    rt: &Runtime,
+    client: Arc<hydrus_api::Client>,
+    hashes: Vec<String>,
+    interrogator: Arc<Interrogator>,
+    threshold: f32,
+    service_key: &str,
+    dry_run: bool,
+) {
+    hashes.par_iter().for_each(|hash| {
+        if let Err(e) = tag_image(
+            rt,
+            client.clone(),
+            interrogator.clone(),
+            threshold,
+            service_key,
+            hash,
+            dry_run,
+        ) {
+            eprintln!("Error evaluating hash: {:?}", e);
+        }
+    });
+}
+
 fn get_tag_service_key_from_name(
     rt: &Runtime,
     client: &hydrus_api::Client,
@@ -225,14 +263,47 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     match args.command {
+        Commands::Eval {
+            common:
+                CommonArgs {
+                    model_dir,
+                    threshold,
+                    tag_service,
+                    access_key,
+                    host,
+                    dry_run,
+                },
+            hashes,
+        } => {
+            let rt = Runtime::new()?;
+            let client = Arc::new(hydrus_api::Client::new(host, access_key));
+
+            let interrogator = Arc::new(Interrogator::init(&model_dir)?);
+            let service_key = get_tag_service_key_from_name(&rt, &client, &tag_service)?;
+
+            tag_images(
+                &rt,
+                client,
+                hashes,
+                interrogator,
+                threshold,
+                &service_key,
+                dry_run,
+            );
+
+            Ok(())
+        }
         Commands::Daemon {
-            model_dir,
-            threshold,
-            tag_service,
+            common:
+                CommonArgs {
+                    model_dir,
+                    threshold,
+                    tag_service,
+                    access_key,
+                    host,
+                    dry_run,
+                },
             interval,
-            access_key,
-            host,
-            dry_run,
         } => {
             let rt = Runtime::new()?;
             let client = Arc::new(hydrus_api::Client::new(host, access_key));
