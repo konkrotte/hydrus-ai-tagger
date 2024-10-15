@@ -9,7 +9,7 @@ RUN --mount=type=bind,source=src,target=src \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     <<EOF
 set -e
-cargo build --release
+cargo build --release --features load-dynamic
 cp ./target/release/$APP_NAME /bin/rustapp
 EOF
 
