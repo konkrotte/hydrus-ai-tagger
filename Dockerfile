@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-venv && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /venv
-RUN /venv/bin/python -m pip install onnxruntime
+RUN /venv/bin/python -m pip install onnxruntime-gpu
 
 COPY --from=build /bin/rustapp /bin/rustapp
 COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y python3 python3-pip python3-venv && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv /venv
-RUN /venv/bin/python -m pip install onnxruntime
+RUN /venv/bin/python -m pip install onnxruntime-gpu
 
 COPY --from=build /bin/rustapp /bin/rustapp
 COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
