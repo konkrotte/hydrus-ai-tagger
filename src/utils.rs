@@ -1,6 +1,5 @@
 use std::{
     fs,
-    hash::Hash,
     io::{self, BufRead},
     path,
 };

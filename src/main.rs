@@ -7,12 +7,10 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use cli::*;
-use indicatif::{
-    HumanDuration, ParallelProgressIterator, ProgressBar, ProgressState, ProgressStyle,
-};
+use indicatif::{HumanDuration, ParallelProgressIterator, ProgressState, ProgressStyle};
 use interrogator::Interrogator;
 use log::{error, info, warn};
-use rayon::{prelude::*, vec};
+use rayon::prelude::*;
 use tagger::Tagger;
 use tokio::runtime::Runtime;
 use utils::parse_hashes_file;
