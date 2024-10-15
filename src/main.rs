@@ -65,14 +65,20 @@ impl App {
                 let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
                 let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
 
-                let hashes = if let Some(hashes) = &target_images.hashes {
-                    hashes
-                } else if let Some(file_path) = &target_images.file {
-                    &parse_hashes_file(file_path)?
-                } else if let Some(_) = target_images.automatic {
-                    &tagger.get_untagged_images(&service_key)?
-                } else {
-                    return Ok(());
+                let hashes = match (
+                    &target_images.hashes,
+                    &target_images.file,
+                    &target_images.automatic,
+                ) {
+                    (Some(hashes), _, _) => hashes,
+                    (_, Some(file_path), _) => &parse_hashes_file(file_path)?,
+                    (_, _, Some(automatic)) if *automatic => {
+                        &tagger.get_untagged_images(&service_key)?
+                    }
+                    _ => {
+                        println!("Not doing anything");
+                        return Ok(());
+                    }
                 };
 
                 let style = ProgressStyle::with_template(
