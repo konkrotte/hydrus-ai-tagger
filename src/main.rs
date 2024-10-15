@@ -29,6 +29,11 @@ const DEFAULT_THRESHOLD: f32 = 0.35;
 const DEFAULT_TAG_SERVICE: &str = "ai tags";
 const DEFAULT_INTERVAL: usize = 60;
 
+/// Kaomoji tags to be excluded from the process of replacing '_' with space
+const KAOMOJIS: &[&str] = &[
+    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
+    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
+];
 
 fn decode_image(bytes: &[u8]) -> Result<DynamicImage> {
     let mut reader = ImageReader::new(Cursor::new(bytes));
@@ -176,12 +181,6 @@ fn get_tag_service_key_from_name(
         .ok_or(anyhow!("Could not find tag service {}", tag_service))?;
     Ok(service_key)
 }
-
-/// Kaomoji tags to be excluded from the process of replacing '_' with space
-const KAOMOJIS: &[&str] = &[
-    "0_0", "(o)_(o)", "+_+", "+_-", "._.", "<o>_<o>", "<|>_<|>", "=_=", ">_<", "3_3", "6_9", ">_o",
-    "@_@", "^_^", "o_o", "u_u", "x_x", "|_|", "||_||",
-];
 
 pub fn get_rating(ratings: &IndexMap<String, f32>) -> Result<String> {
     ratings
