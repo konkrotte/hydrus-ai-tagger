@@ -114,33 +114,33 @@ jobs:
       new_crate_version: ${{ steps.full_version.outputs.crate_version || steps.new_version.outputs.crate_version || steps.none_version.outputs.crate_version }}
 
   check-crate-type:
-    uses: ./.gitea/workflows/crate_type.yaml
+    uses: ./.github/workflows/crate_type.yaml
 
   run-ci:
     needs: validate-input
-    uses: ./.gitea/workflows/ci.yaml
+    uses: ./.github/workflows/ci.yaml
 
   add-notice:
     needs: [get-version, run-ci]
-    uses: ./.gitea/workflows/add_notice.yaml
+    uses: ./.github/workflows/add_notice.yaml
     with:
       commit_message: ${{  needs.get-version.outputs.new_crate_version }}
 
   cargo-semver-checks:
     needs: [get-version, run-ci]
-    uses: ./.gitea/workflows/cargo_semver_checks.yaml
+    uses: ./.github/workflows/cargo_semver_checks.yaml
     with:
       bump-version: ${{ needs.get-version.outputs.new_crate_version }}
 
   bump-version:
     needs: [get-version, cargo-semver-checks]
-    uses: ./.gitea/workflows/bump_version.yaml
+    uses: ./.github/workflows/bump_version.yaml
     with:
       crate-version: ${{  needs.get-version.outputs.new_crate_version }}
 
   update-attributions:
     needs: [get-version, bump-version]
-    uses: ./.gitea/workflows/cargo_attribution.yaml
+    uses: ./.github/workflows/cargo_attribution.yaml
     with:
       commit_message: ${{ needs.get-version.outputs.new_crate_version }}
 

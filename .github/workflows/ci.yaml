@@ -70,7 +70,7 @@ jobs:
         run: cargo doc --workspace --all-features
 
   check-crate-type:
-    uses: ./.gitea/workflows/crate_type.yaml
+    uses: ./.github/workflows/crate_type.yaml
 
   cargo-test-doc:
     needs: check-crate-type
@@ -124,7 +124,7 @@ jobs:
         run: typos
 
   check-msrv:
-    uses: ./.gitea/workflows/check_msrv.yaml
+    uses: ./.github/workflows/check_msrv.yaml
 
   cargo-miri:
-    uses: ./.gitea/workflows/cargo_miri.yaml
+    uses: ./.github/workflows/cargo_miri.yaml
