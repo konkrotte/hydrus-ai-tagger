@@ -33,11 +33,12 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.platform.target }}
 
-      - name: Publish release
+      - name: Zip binaries
+        run: zip ${{ matrix.platform.name }}.zip . target/${{ matrix.platform.target }}/release/hydrus-ai-tagger target/${{ matrix.platform.target }}/release/libonnxruntime*
+
+      - name: Create release
         uses: https://gitea.com/actions/gitea-release-action@v1
         env:
           NODE_OPTIONS: "--experimental-fetch" # if nodejs < 18
         with:
-          files: |
-            target/${{ matrix.platform.target }}/release/hydrus-ai-tagger
-            target/${{ matrix.platform.target }}/release/libonnxruntime*
+          files: ${{ matrix.platform.name }}.zip
