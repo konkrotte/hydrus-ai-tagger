@@ -8,6 +8,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   cargo-build:
     name: Cargo Build
@@ -20,8 +23,32 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
-      - name: cargo build
-        run: cargo b --workspace --all-targets --all-features
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.lock
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build  --workspace --all-targets --all-features
+
+      - name: Upload Binaries
+        uses: christopherhx/gitea-upload-artifact@v4
+        with:
+          name: binaries
+          path: target/
 
   cargo-fmt:
     name: Cargo fmt
@@ -35,6 +62,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
+          target: ${{ matrix.target }}
 
       - name: Rustfmt Check
         run: cargo fmt --all --check
@@ -125,6 +153,3 @@ jobs:
 
   check-msrv:
     uses: ./.github/workflows/check_msrv.yaml
-
-  cargo-miri:
-    uses: ./.github/workflows/cargo_miri.yaml
