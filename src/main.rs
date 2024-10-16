@@ -14,6 +14,7 @@ use log::{error, info, warn};
 use rayon::prelude::*;
 use tagger::Tagger;
 use tokio::runtime::Runtime;
+use tracing_log::AsTrace;
 use utils::parse_hashes_file;
 
 mod cli;
@@ -149,22 +150,23 @@ impl App {
 }
 
 fn main() -> Result<()> {
+    let args = Args::parse();
+
     match std::io::stdout().is_terminal() {
         true => tracing_subscriber::fmt()
             .pretty()
             .with_thread_names(false)
-            .with_max_level(tracing::Level::WARN)
+            .with_max_level(args.verbose.log_level_filter().as_trace())
             .with_line_number(false)
             .without_time()
             .with_file(false)
             .with_writer(std::io::stderr)
             .init(),
         false => tracing_subscriber::fmt()
+            .with_max_level(args.verbose.log_level_filter().as_trace())
             .with_writer(std::io::stderr)
             .init(),
     }
-
-    let args = Args::parse();
 
     let app = App::new(args)?;
     app.run()

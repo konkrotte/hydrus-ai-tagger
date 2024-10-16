@@ -7,6 +7,9 @@ use crate::*;
 #[derive(Parser)]
 #[command(author, version, about)]
 pub struct Args {
+    #[command(flatten)]
+    pub verbose: clap_verbosity_flag::Verbosity,
+
     #[command(subcommand)]
     pub command: Commands,
 }
