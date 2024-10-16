@@ -34,14 +34,6 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.TOKEN }}
 
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-
-
       - name: Build and push Docker image - CPU
         uses: docker/build-push-action@v6
         with:
@@ -50,12 +42,8 @@ jobs:
           tags: git.dimlight.eu/konkrotte/hydrus-ai-tagger:master-cpu
           target: cpu
           platforms: linux/amd64, linux/arm64
-          cache-from: |
-            type=local,src=/tmp/.buildx-cache
-            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache
-          cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # linux/arm64 doesn't work because onnxruntime-gpu is not available
       - name: Build and push Docker image - CUDA
@@ -66,17 +54,8 @@ jobs:
           tags: git.dimlight.eu/konkrotte/hydrus-ai-tagger:master-cuda
           target: cuda
           platforms: linux/amd64
-          cache-from: |
-            type=local,src=/tmp/.buildx-cache
-            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache
-          cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache,mode=max
-
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       # TODO: Fix TensorRT Docker images
       # - name: Build and push Docker image - TensorRT
