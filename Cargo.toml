@@ -36,3 +36,6 @@ panic = "abort"
 
 [features]
 load-dynamic = ["ort/load-dynamic"]
+
+[dev-dependencies]
+tempfile = "3.13.0"
