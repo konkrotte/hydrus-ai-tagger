@@ -69,23 +69,24 @@ impl App {
                         &tagger.get_untagged_images(&service_key)?
                     }
                     _ => {
-                        println!("Not doing anything");
+                        warn!("Not doing anything");
                         return Ok(());
                     }
                 };
+
+                if hashes.is_empty() {
+                    info!("Nothing to tag");
+                    return Ok(());
+                }
 
                 let style = ProgressStyle::with_template(
                     "[{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos}/{len} ({eta})",
                 )
                 .unwrap()
                 .with_key("eta", |state: &ProgressState, w: &mut dyn Write| {
-                    write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+                    write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap();
                 })
                 .progress_chars("#>-");
-
-                if *dry_run {
-                    warn!("Not actually adding tags");
-                }
 
                 let start_time = Instant::now();
 
@@ -121,6 +122,10 @@ impl App {
 
                 loop {
                     let start_time = Instant::now();
+
+                    if *dry_run {
+                        warn!("Not actually adding tags");
+                    }
 
                     match tagger.get_untagged_images(&service_key) {
                         Ok(hashes) => {
