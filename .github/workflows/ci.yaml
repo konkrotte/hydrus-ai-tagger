@@ -149,13 +149,8 @@ jobs:
       - name: Fetch Repository
         uses: actions/checkout@v4
 
-      - name: Install Typos
-        uses: taiki-e/cache-cargo-install-action@v2
-        with:
-          tool: typos-cli
-
-      - name: run typos
-        run: typos
+      - name: Check spelling of file.txt
+        uses: crate-ci/typos@master
 
   check-msrv:
     uses: ./.github/workflows/check_msrv.yaml
