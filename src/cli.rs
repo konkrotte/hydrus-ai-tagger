@@ -2,7 +2,7 @@ use std::path;
 
 use clap::{Parser, Subcommand, ValueHint};
 
-use crate::*;
+use crate::{DEFAULT_INTERVAL, DEFAULT_TAG_SERVICE, DEFAULT_THRESHOLD};
 
 #[derive(Parser)]
 #[command(author, version, about)]

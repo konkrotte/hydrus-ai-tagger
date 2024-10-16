@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use cli::*;
+use cli::{Args, Commands, CommonArgs};
 use indicatif::{HumanDuration, ParallelProgressIterator, ProgressState, ProgressStyle};
 use interrogator::Interrogator;
 use log::{error, info, warn};

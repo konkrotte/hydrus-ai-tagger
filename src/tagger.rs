@@ -12,7 +12,10 @@ use log::{debug, warn};
 use rayon::prelude::*;
 use tokio::runtime::Runtime;
 
-use crate::{interrogator::Interrogator, utils::*};
+use crate::{
+    interrogator::Interrogator,
+    utils::{decode_image, filter_and_process_tags, get_rating},
+};
 
 pub struct Tagger {
     rt: Arc<Runtime>,
