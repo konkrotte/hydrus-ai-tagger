@@ -1,0 +1,46 @@
+name: "Build & Release"
+
+permissions:
+  # To upload files to GitHub Releases
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  artifacts:
+    name: Build release binaries for ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runs-on }}
+
+    strategy:
+      matrix:
+        platform:
+          - name: Linux-x86_64
+            runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.platform.target }}
+
+      - name: Get the release version from the tag
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+
+      - name: Publish release
+        uses: akkuman/gitea-release-action@v1
+        env:
+          NODE_OPTIONS: "--experimental-fetch" # if nodejs < 18
+        with:
+          files: |-
+            target/release/hydrus-ai-tagger
+            target/release/libonnxruntime*

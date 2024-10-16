@@ -21,22 +21,27 @@ jobs:
         platform:
           - name: Linux-x86_64
             runs-on: ubuntu-latest
-            target: x86_64-unknown-linux-musl
+            target: x86_64-unknown-linux-gnu
     steps:
       - name: Fetch Repository
         uses: actions/checkout@v4
 
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: ${{ matrix.platform.target }}
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.platform.target }}
 
       - name: Upload Binary
         uses: christopherhx/gitea-upload-artifact@v4
         with:
           name: ${{ matrix.platform.name }}
-          path: target/release/hydrus-ai-tagger
+          path: |
+            target/${{ matrix.platform.target }}/release/hydrus-ai-tagger
+            target/${{ matrix.platform.target }}/release/libonnxruntime*
+          compression-level: 9
 
   cargo-build:
     name: Cargo Build
