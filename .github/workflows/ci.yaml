@@ -149,7 +149,7 @@ jobs:
       - name: Fetch Repository
         uses: actions/checkout@v4
 
-      - name: Check spelling of file.txt
+      - name: Check for typos
         uses: crate-ci/typos@master
 
   check-msrv:
