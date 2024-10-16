@@ -43,8 +43,12 @@ jobs:
           target: cpu
           # TODO: Fix linux/arm64 builds
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache,mode=max
 
       # linux/arm64 doesn't work because onnxruntime-gpu is not available
       - name: Build and push Docker image - CUDA
@@ -55,8 +59,12 @@ jobs:
           tags: git.dimlight.eu/konkrotte/hydrus-ai-tagger:master-cuda
           target: cuda
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            mode=max,image-manifest=true,oci-mediatypes=true,type=registry,ref=${{ env.REGISTRY_CACHE }}:buildcache,mode=max
 
       # TODO: Fix TensorRT Docker images
       # - name: Build and push Docker image - TensorRT
