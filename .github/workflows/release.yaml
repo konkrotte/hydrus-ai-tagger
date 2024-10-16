@@ -27,17 +27,13 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          targets: ${{ matrix.platform.target }}
+          target: ${{ matrix.platform.target }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.platform.target }}
 
-      - name: Get the release version from the tag
-        shell: bash
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
       - name: Publish release
-        uses: akkuman/gitea-release-action@v1
+        uses: https://gitea.com/actions/gitea-release-action@v1
         env:
           NODE_OPTIONS: "--experimental-fetch" # if nodejs < 18
         with:
