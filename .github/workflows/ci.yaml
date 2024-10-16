@@ -12,6 +12,48 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  artifacts:
+    name: Build artifacts for ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runs-on }}
+
+    strategy:
+      matrix:
+        platform:
+          - name: Linux-x86_64
+            runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+    steps:
+      - name: Fetch Repository
+        uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-build-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-build-
+
+      - name: Build test
+        run: cargo build --release
+
+      - name: Upload Binary
+        uses: christopherhx/gitea-upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.name }}
+          path: target/release/hydrus-ai-tagger
+
   cargo-build:
     name: Cargo Build
     runs-on: ubuntu-latest
@@ -27,28 +69,20 @@ jobs:
         id: get-hash
         with:
           patterns: |-
-            **/Cargo.lock
+            **/Cargo.toml
 
       - name: Set up cargo cache
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
           key: ${{ runner.os }}-cargo-${{ steps.get-hash.outputs.hash }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Build
+      - name: Build test
         run: cargo build  --workspace --all-targets --all-features
-
-      - name: Upload Binaries
-        uses: christopherhx/gitea-upload-artifact@v4
-        with:
-          name: binaries
-          path: target/
 
   cargo-fmt:
     name: Cargo fmt
@@ -62,7 +96,22 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: rustfmt
-          target: ${{ matrix.target }}
+
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-fmt-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-fmt-
 
       - name: Rustfmt Check
         run: cargo fmt --all --check
@@ -80,6 +129,22 @@ jobs:
         with:
           components: clippy
 
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-clippy-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-clippy-
+
       - name: Clippy Check
         run: cargo clippy --workspace --all-targets --all-features -- -Dwarnings
 
@@ -93,6 +158,22 @@ jobs:
 
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-
 
       - name: Cargo doc test
         run: cargo doc --workspace --all-features
@@ -113,6 +194,22 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
 
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-test-doc-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-test-doc-
+
       - name: Cargo test doc
         run: cargo test --doc --workspace --all-features
 
@@ -126,6 +223,22 @@ jobs:
 
       - name: Install stable toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - uses: https://gitea.com/yuusha/js-hashfiles@v1
+        id: get-hash
+        with:
+          patterns: |-
+            **/Cargo.toml
+
+      - name: Set up cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-next-test-${{ steps.get-hash.outputs.hash }}
+          restore-keys: ${{ runner.os }}-cargo-next-test-
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@v2
