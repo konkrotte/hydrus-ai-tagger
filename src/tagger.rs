@@ -38,6 +38,7 @@ impl Tagger {
             threshold,
         }
     }
+
     pub fn tag_image(&self, service_key: &str, hash: &str, dry_run: bool) -> Result<Vec<String>> {
         debug!("Tagging {}", hash);
 
