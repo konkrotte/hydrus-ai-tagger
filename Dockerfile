@@ -23,7 +23,7 @@ COPY --from=build /bin/hydrus-ai-tagger /bin/hydrus-ai-tagger
 COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD [hydrus-ai-tagger, "daemon"]
+CMD ["hydrus-ai-tagger", "daemon"]
 
 FROM nvcr.io/nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04 AS cuda
 RUN apt-get update && apt-get install -y python3 python3-pip python3-venv && \
@@ -36,7 +36,7 @@ COPY --from=build /bin/hydrus-ai-tagger /bin/hydrus-ai-tagger
 COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD [hydrus-ai-tagger, "daemon"]
+CMD ["hydrus-ai-tagger", "daemon"]
 
 FROM ubuntu:22.04 AS cpu
 RUN apt-get update && apt-get install -y python3 python3-pip python3-venv && \
@@ -49,4 +49,4 @@ COPY --from=build /bin/hydrus-ai-tagger /bin/hydrus-ai-tagger
 COPY --chmod=0755 ./entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD [hydrus-ai-tagger, "daemon"]
+CMD ["hydrus-ai-tagger", "daemon"]
