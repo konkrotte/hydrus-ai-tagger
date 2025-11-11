@@ -7,7 +7,7 @@ RUN --mount=type=bind,source=src,target=src \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     <<EOF
 set -e
-cargo build --release --features load-dynamic
+cargo build --release
 cp ./target/release/hydrus-ai-tagger /bin/hydrus-ai-tagger
 EOF
 
