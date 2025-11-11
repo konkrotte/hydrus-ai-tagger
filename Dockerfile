@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.81.0
+ARG RUST_VERSION=1.91.1
 FROM rust:${RUST_VERSION} AS build
 WORKDIR /app
 RUN --mount=type=bind,source=src,target=src \
