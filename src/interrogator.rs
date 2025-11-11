@@ -8,9 +8,11 @@ use image::{
 use indexmap::IndexMap;
 use log::{debug, info};
 use ndarray::{Array, Array4};
-use ort::{
-    inputs, CUDAExecutionProvider, GraphOptimizationLevel, Session, TensorRTExecutionProvider,
+use ort::execution_providers::{
+    CUDAExecutionProvider, CoreMLExecutionProvider, TensorRTExecutionProvider,
 };
+use ort::inputs;
+use ort::session::{builder::GraphOptimizationLevel, Session};
 use serde::{Deserialize, Deserializer, Serialize};
 
 type InterrogateReturn = Result<(Option<IndexMap<String, f32>>, IndexMap<String, f32>)>;
@@ -103,13 +105,21 @@ impl Interrogator {
             .filter_map(|result: Result<Tag, csv::Error>| result.ok().map(|tag| tag.name))
             .collect();
         let model_file = model_dir.join(model_info.model_file);
+        let mut execution_providers = Vec::new();
+
+        #[cfg(target_os = "macos")]
+        execution_providers.push(CoreMLExecutionProvider::default().build());
+
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        {
+            execution_providers.push(TensorRTExecutionProvider::default().build());
+            execution_providers.push(CUDAExecutionProvider::default().build());
+        }
+
         let model = Session::builder()?
             .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(thread::available_parallelism()?.get())?
-            .with_execution_providers([
-                TensorRTExecutionProvider::default().build(),
-                CUDAExecutionProvider::default().build(),
-            ])?
+            .with_execution_providers(execution_providers)?
             .commit_from_file(model_file)?;
 
         Ok(Interrogator {

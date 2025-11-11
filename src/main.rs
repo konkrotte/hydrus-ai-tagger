@@ -8,7 +8,9 @@ use std::{
 use anyhow::Result;
 use clap::Parser;
 use cli::{Args, Commands, CommonArgs};
-use indicatif::{HumanDuration, ParallelProgressIterator, ProgressState, ProgressStyle};
+use indicatif::{
+    style::ProgressTracker, HumanDuration, ParallelProgressIterator, ProgressState, ProgressStyle,
+};
 use interrogator::Interrogator;
 use log::{error, info, warn};
 use rayon::prelude::*;
@@ -55,7 +57,7 @@ impl App {
             } => {
                 let client = Arc::new(hydrus_api::Client::new(host, access_key));
                 let interrogator = Arc::new(Interrogator::init(model_dir)?);
-                let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
+                let tagger = Tagger::new(self.rt.clone(), client, model_dir.clone(), *threshold)?;
                 let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
 
                 let hashes = match (
@@ -116,16 +118,20 @@ impl App {
             } => {
                 let interval_duration = Duration::from_secs((interval * 60) as u64);
                 let client = Arc::new(hydrus_api::Client::new(host, access_key));
-                let interrogator = Arc::new(Interrogator::init(model_dir)?);
-                let tagger = Tagger::new(self.rt.clone(), client, interrogator, *threshold);
-                let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
+
+                if *dry_run {
+                    warn!("Not actually adding tags");
+                }
 
                 loop {
                     let start_time = Instant::now();
-
-                    if *dry_run {
-                        warn!("Not actually adding tags");
-                    }
+                    let tagger = Tagger::new(
+                        self.rt.clone(),
+                        client.clone(),
+                        model_dir.clone(),
+                        *threshold,
+                    )?;
+                    let service_key = tagger.get_tag_service_key_from_name(tag_service)?;
 
                     match tagger.get_untagged_images(&service_key) {
                         Ok(hashes) => {

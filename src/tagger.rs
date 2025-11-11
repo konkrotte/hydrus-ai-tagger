@@ -1,6 +1,7 @@
+use std::path;
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use hydrus_api::api_core::{
     common::FileIdentifier,
     endpoints::{
@@ -28,15 +29,17 @@ impl Tagger {
     pub fn new(
         rt: Arc<Runtime>,
         client: Arc<hydrus_api::Client>,
-        interrogator: Arc<Interrogator>,
+        model_dir: path::PathBuf,
         threshold: f32,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let interrogator = Arc::new(Interrogator::init(&model_dir)?);
+
+        Ok(Self {
             rt,
             client,
             interrogator,
             threshold,
-        }
+        })
     }
 
     pub fn tag_image(&self, service_key: &str, hash: &str, dry_run: bool) -> Result<Vec<String>> {
